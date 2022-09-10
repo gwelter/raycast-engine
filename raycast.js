@@ -1,4 +1,4 @@
-const TILE_SIZE = 64;
+const TILE_SIZE = 32;
 const MAP_NUM_ROWS = 11;
 const MAP_NUM_COLS = 15;
 
@@ -7,8 +7,10 @@ const WINDOW_HEIGHT = MAP_NUM_ROWS * TILE_SIZE;
 
 const FOV_ANGLE = 60 * (Math.PI / 180);
 
-const WALL_STRIP_WIDTH = 30;
+const WALL_STRIP_WIDTH = 1;
 const NUM_RAYS = WINDOW_WIDTH / WALL_STRIP_WIDTH;
+
+const distanceProjectedPlane = (WINDOW_WIDTH / 2) / Math.tan(FOV_ANGLE / 2);
 
 class Map {
     constructor() {
@@ -91,8 +93,7 @@ class Player {
 class Ray {
     constructor(rayAngle) {
         this.rayAngle = normalizeAngle(rayAngle);
-        this.wallHitX = 0;
-        this.wallHitY = 0;
+        this.wallHitPoint = 0;
         this.distance = 0;
 
         this.isRayFacingDown = this.rayAngle > 0 && this.rayAngle < Math.PI;
@@ -117,7 +118,6 @@ class Ray {
         let xstep, ystep = 0;
         let nextXTouch = xintercept;
         let nextYTouch = yintercept;
-        if (this.isRayFacingUp) nextYTouch--;
 
         ystep = TILE_SIZE;
         ystep *= this.isRayFacingUp ? -1 : 1;
@@ -134,7 +134,7 @@ class Ray {
             //     nextYTouch,
             //     3
             // )
-            if (grid.hasWallAt(nextXTouch, nextYTouch)) {
+            if (grid.hasWallAt(nextXTouch, nextYTouch - (this.isRayFacingUp ? 1 : 0))) {
                 foundWallHit = true;
             } else {
                 nextXTouch += xstep;
@@ -158,7 +158,6 @@ class Ray {
         let xstep, ystep = 0;
         let nextXTouch = xintercept;
         let nextYTouch = yintercept;
-        if (this.isRayFacingLeft) nextXTouch--;
 
         xstep = TILE_SIZE;
         xstep *= this.isRayFacingLeft ? -1 : 1;
@@ -175,7 +174,7 @@ class Ray {
             //     nextYTouch,
             //     3
             // )
-            if (grid.hasWallAt(nextXTouch, nextYTouch)) {
+            if (grid.hasWallAt(nextXTouch - (this.isRayFacingLeft ? 1 : 0), nextYTouch)) {
                 foundWallHit = true;
             } else {
                 nextXTouch += xstep;
@@ -192,18 +191,14 @@ class Ray {
 
         const horizontalDistance = distanceBetweenPoints(player.x, player.y, horizontalWallHit.x, horizontalWallHit.y);
         const verticalDistance = distanceBetweenPoints(player.x, player.y, verticalWallHit.x, verticalWallHit.y);
-        const closerPoint = horizontalDistance < verticalDistance ? horizontalWallHit : verticalWallHit;
-        stroke("red");
-        line(player.x, player.y, closerPoint.x, closerPoint.y);
+
+        this.wasHitVertical = verticalDistance < horizontalDistance;
+        this.wallHitPoint = !this.wasHitVertical ? horizontalWallHit : verticalWallHit;
+        this.distance = this.wasHitVertical ? verticalDistance : horizontalDistance;
     }
     render() {
         stroke("rgba(255, 0, 0, 0.3)");
-        line(
-            player.x,
-            player.y,
-            player.x + Math.cos(this.rayAngle) * 30,
-            player.y + Math.sin(this.rayAngle) * 30
-        );
+        line(player.x, player.y, this.wallHitPoint.x, this.wallHitPoint.y);
     }
 }
 
@@ -280,6 +275,7 @@ function castAllRays() {
 
 function update() {
     player.update();
+    castAllRays();
 }
 
 function draw() {
@@ -290,5 +286,4 @@ function draw() {
         ray.render();
     }
     player.render();
-    castAllRays();
 }
