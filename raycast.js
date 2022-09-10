@@ -8,7 +8,7 @@ const MINIMAP_SCALE_FACTOR = 0.2;
 
 const FOV_ANGLE = 60 * (Math.PI / 180);
 
-const WALL_STRIP_WIDTH = 1;
+const WALL_STRIP_WIDTH = 5;
 const NUM_RAYS = WINDOW_WIDTH / WALL_STRIP_WIDTH;
 
 const distanceProjectedPlane = (WINDOW_WIDTH / 2) / Math.tan(FOV_ANGLE / 2);
@@ -289,11 +289,37 @@ function update() {
     castAllRays();
 }
 
+function render3DProjectedWalls() {
+    for (var i = 0; i < NUM_RAYS; i++) {
+        const ray = rays[i];
+
+        const fixedRaydistance = ray.distance * Math.cos((ray.rayAngle - player.rotationAngle));
+
+        //Projected wall height
+        const wallStripHeight = TILE_SIZE / fixedRaydistance * distanceProjectedPlane;
+
+        //Draw a rectangle with the calculated height
+        const alpha = 170 / fixedRaydistance;
+        fill(`rgba(255, 255, 255, ${alpha})`);
+        noStroke();
+        rect(
+            i * WALL_STRIP_WIDTH,
+            WINDOW_HEIGHT / 2 - wallStripHeight / 2,
+            WALL_STRIP_WIDTH,
+            wallStripHeight
+        )
+    }
+}
+
 function draw() {
+    clear('#212121');
     update();
 
+    render3DProjectedWalls();
+
     grid.render();
-    for (const ray of rays) {
+    for (var i = 0; i < NUM_RAYS; i++) {
+        const ray = rays[i];
         ray.render();
     }
     player.render();
