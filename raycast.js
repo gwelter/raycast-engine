@@ -1,4 +1,4 @@
-const TILE_SIZE = 32;
+const TILE_SIZE = 64;
 const MAP_NUM_ROWS = 11;
 const MAP_NUM_COLS = 15;
 
@@ -101,16 +101,23 @@ class Ray {
         this.isRayFacingRight = this.rayAngle < Math.PI * 0.5 || this.rayAngle > Math.PI * 1.5;
         this.isRayFacingLeft = !this.isRayFacingRight;
     }
-    cast(columnId) {
+    horizontalInterception() {
         let xintercept, yintercept = 0;
-        let xstep, ystep = 0;
-        let wallHitX, wallHitY = 0;
-        let foundHorizontalWallHit = false;
-
         yintercept = Math.floor(player.y / TILE_SIZE) * TILE_SIZE;
         yintercept += this.isRayFacingDown ? TILE_SIZE : 0;
 
-        xintercept = player.x + (yintercept - player.y) / Math.tan(this.rayAngle);
+        let opositeSide = yintercept - player.y;
+
+        xintercept = player.x + opositeSide / Math.tan(this.rayAngle);
+
+        return { xintercept, yintercept }
+    }
+    horizontalStep(xintercept, yintercept) {
+        let foundWallHit = false;
+        let xstep, ystep = 0;
+        let nextXTouch = xintercept;
+        let nextYTouch = yintercept;
+        if (this.isRayFacingUp) nextYTouch--;
 
         ystep = TILE_SIZE;
         ystep *= this.isRayFacingUp ? -1 : 1;
@@ -119,24 +126,79 @@ class Ray {
         xstep *= (this.isRayFacingLeft && xstep > 0) ? -1 : 1;
         xstep *= (this.isRayFacingRight && xstep < 0) ? -1 : 1;
 
-        let nextHorzTouchX = xintercept;
-        let nextHorzTouchY = yintercept;
-
-        if (this.isRayFacingUp) nextHorzTouchY--;
-
-        while (!foundHorizontalWallHit) {
-            if (grid.hasWallAt(nextHorzTouchX, nextHorzTouchY)) {
-                wallHitX = nextHorzTouchX;
-                wallHitY = nextHorzTouchY;
-
-                stroke("red");
-                line(player.x, player.y, wallHitX, wallHitY);
-                foundHorizontalWallHit = true;
+        while (!foundWallHit) {
+            fill("red");
+            stroke("red");
+            circle(
+                nextXTouch,
+                nextYTouch,
+                3
+            )
+            line(player.x, player.y, nextXTouch, nextYTouch);
+            if (grid.hasWallAt(nextXTouch, nextYTouch)) {
+                foundWallHit = true;
             } else {
-                nextHorzTouchX += xstep;
-                nextHorzTouchY += ystep;
+                nextXTouch += xstep;
+                nextYTouch += ystep;
             }
         }
+        return { x: nextXTouch, y: nextYTouch };
+    }
+    verticalInterception() {
+        let xintercept, yintercept = 0;
+        xintercept = Math.floor(player.x / TILE_SIZE) * TILE_SIZE;
+        xintercept += this.isRayFacingRight ? TILE_SIZE : 0;
+
+        let adjecentSide = xintercept - player.x;
+
+        yintercept = player.y + adjecentSide * Math.tan(this.rayAngle);
+
+        fill("green");
+        stroke("green");
+        circle(
+            xintercept,
+            yintercept,
+            3
+        )
+        return { xintercept, yintercept }
+    }
+    verticalStep(xintercept, yintercept) {
+        let foundWallHit = false;
+        let xstep, ystep = 0;
+        let nextXTouch = xintercept;
+        let nextYTouch = yintercept;
+        if (this.isRayFacingLeft) nextXTouch--;
+
+        xstep = TILE_SIZE;
+        xstep *= this.isRayFacingLeft ? -1 : 1;
+
+        ystep = TILE_SIZE * Math.tan(this.rayAngle);
+        ystep *= (this.isRayFacingUp && ystep > 0) ? -1 : 1;
+        ystep *= (this.isRayFacingDown && ystep < 0) ? -1 : 1;
+
+        while (!foundWallHit) {
+            fill("green");
+            stroke("green");
+            circle(
+                nextXTouch,
+                nextYTouch,
+                3
+            )
+            line(player.x, player.y, nextXTouch, nextYTouch);
+            if (grid.hasWallAt(nextXTouch, nextYTouch)) {
+                foundWallHit = true;
+            } else {
+                nextXTouch += xstep;
+                nextYTouch += ystep;
+            }
+        }
+        return { x: nextXTouch, y: nextYTouch };
+    }
+    cast(columnId) {
+        const horizontal = this.horizontalInterception();
+        const horizontalWallHit = this.horizontalStep(horizontal.xintercept, horizontal.yintercept);
+        const vertical = this.verticalInterception();
+        const verticalWallHit = this.verticalStep(vertical.xintercept, vertical.yintercept);
     }
     render() {
         stroke("rgba(255, 0, 0, 0.3)");
