@@ -1,9 +1,10 @@
-const TILE_SIZE = 32;
+const TILE_SIZE = 64;
 const MAP_NUM_ROWS = 11;
 const MAP_NUM_COLS = 15;
 
 const WINDOW_WIDTH = MAP_NUM_COLS * TILE_SIZE;
 const WINDOW_HEIGHT = MAP_NUM_ROWS * TILE_SIZE;
+const MINIMAP_SCALE_FACTOR = 0.2;
 
 const FOV_ANGLE = 60 * (Math.PI / 180);
 
@@ -43,7 +44,12 @@ class Map {
                 var tileColor = this.grid[i][j] == 1 ? "#222" : "#fff";
                 stroke("#222");
                 fill(tileColor);
-                rect(tileX, tileY, TILE_SIZE, TILE_SIZE);
+                rect(
+                    MINIMAP_SCALE_FACTOR * tileX,
+                    MINIMAP_SCALE_FACTOR * tileY,
+                    MINIMAP_SCALE_FACTOR * TILE_SIZE,
+                    MINIMAP_SCALE_FACTOR * TILE_SIZE
+                );
             }
         }
     }
@@ -76,16 +82,16 @@ class Player {
         noStroke();
         fill("red");
         circle(
-            this.x,
-            this.y,
-            this.radius
+            MINIMAP_SCALE_FACTOR * this.x,
+            MINIMAP_SCALE_FACTOR * this.y,
+            MINIMAP_SCALE_FACTOR * this.radius
         )
         stroke("red");
         line(
-            this.x,
-            this.y,
-            this.x + Math.cos(this.rotationAngle) * 30,
-            this.y + Math.sin(this.rotationAngle) * 30
+            MINIMAP_SCALE_FACTOR * this.x,
+            MINIMAP_SCALE_FACTOR * this.y,
+            MINIMAP_SCALE_FACTOR * this.x + Math.cos(this.rotationAngle) * 30,
+            MINIMAP_SCALE_FACTOR * this.y + Math.sin(this.rotationAngle) * 30
         )
     }
 }
@@ -198,7 +204,12 @@ class Ray {
     }
     render() {
         stroke("rgba(255, 0, 0, 0.3)");
-        line(player.x, player.y, this.wallHitPoint.x, this.wallHitPoint.y);
+        line(
+            MINIMAP_SCALE_FACTOR * player.x,
+            MINIMAP_SCALE_FACTOR * player.y,
+            MINIMAP_SCALE_FACTOR * this.wallHitPoint.x,
+            MINIMAP_SCALE_FACTOR * this.wallHitPoint.y
+        );
     }
 }
 
