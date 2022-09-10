@@ -127,14 +127,13 @@ class Ray {
         xstep *= (this.isRayFacingRight && xstep < 0) ? -1 : 1;
 
         while (!foundWallHit) {
-            fill("red");
-            stroke("red");
-            circle(
-                nextXTouch,
-                nextYTouch,
-                3
-            )
-            line(player.x, player.y, nextXTouch, nextYTouch);
+            // fill("red");
+            // stroke("red");
+            // circle(
+            //     nextXTouch,
+            //     nextYTouch,
+            //     3
+            // )
             if (grid.hasWallAt(nextXTouch, nextYTouch)) {
                 foundWallHit = true;
             } else {
@@ -152,14 +151,6 @@ class Ray {
         let adjecentSide = xintercept - player.x;
 
         yintercept = player.y + adjecentSide * Math.tan(this.rayAngle);
-
-        fill("green");
-        stroke("green");
-        circle(
-            xintercept,
-            yintercept,
-            3
-        )
         return { xintercept, yintercept }
     }
     verticalStep(xintercept, yintercept) {
@@ -177,14 +168,13 @@ class Ray {
         ystep *= (this.isRayFacingDown && ystep < 0) ? -1 : 1;
 
         while (!foundWallHit) {
-            fill("green");
-            stroke("green");
-            circle(
-                nextXTouch,
-                nextYTouch,
-                3
-            )
-            line(player.x, player.y, nextXTouch, nextYTouch);
+            // fill("green");
+            // stroke("green");
+            // circle(
+            //     nextXTouch,
+            //     nextYTouch,
+            //     3
+            // )
             if (grid.hasWallAt(nextXTouch, nextYTouch)) {
                 foundWallHit = true;
             } else {
@@ -199,6 +189,12 @@ class Ray {
         const horizontalWallHit = this.horizontalStep(horizontal.xintercept, horizontal.yintercept);
         const vertical = this.verticalInterception();
         const verticalWallHit = this.verticalStep(vertical.xintercept, vertical.yintercept);
+
+        const horizontalDistance = distanceBetweenPoints(player.x, player.y, horizontalWallHit.x, horizontalWallHit.y);
+        const verticalDistance = distanceBetweenPoints(player.x, player.y, verticalWallHit.x, verticalWallHit.y);
+        const closerPoint = horizontalDistance < verticalDistance ? horizontalWallHit : verticalWallHit;
+        stroke("red");
+        line(player.x, player.y, closerPoint.x, closerPoint.y);
     }
     render() {
         stroke("rgba(255, 0, 0, 0.3)");
@@ -214,6 +210,12 @@ class Ray {
 var grid = new Map();
 var player = new Player();
 var rays = [];
+
+function distanceBetweenPoints(x1, y1, x2, y2) {
+    const x = Math.pow(x2 - x1, 2);
+    const y = Math.pow(y2 - y1, 2);
+    return Math.sqrt(x + y);
+}
 
 function normalizeAngle(angle) {
     angle = angle % (Math.PI * 2);
@@ -264,8 +266,8 @@ function castAllRays() {
     rays = [];
 
     // loop all columns casting the rays
-    // for (var i = 0; i < NUM_RAYS; i++) {
-    for (var i = 0; i < 1; i++) {
+    for (var i = 0; i < NUM_RAYS; i++) {
+        // for (var i = 0; i < 1; i++) {
         var ray = new Ray(rayAngle);
         ray.cast(columnId);
         rays.push(ray);
