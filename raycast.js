@@ -189,7 +189,7 @@ class Ray {
         }
         return { x: nextXTouch, y: nextYTouch };
     }
-    cast(columnId) {
+    cast() {
         const horizontal = this.horizontalInterception();
         const horizontalWallHit = this.horizontalStep(horizontal.xintercept, horizontal.yintercept);
         const vertical = this.verticalInterception();
@@ -264,8 +264,6 @@ function keyReleased() {
 }
 
 function castAllRays() {
-    var columnId = 0;
-
     // start first ray subtracting half of the FOV
     var rayAngle = player.rotationAngle - (FOV_ANGLE / 2);
 
@@ -275,12 +273,10 @@ function castAllRays() {
     for (var i = 0; i < NUM_RAYS; i++) {
         // for (var i = 0; i < 1; i++) {
         var ray = new Ray(rayAngle);
-        ray.cast(columnId);
+        ray.cast();
         rays.push(ray);
 
         rayAngle += FOV_ANGLE / NUM_RAYS;
-
-        columnId++;
     }
 }
 
@@ -299,8 +295,11 @@ function render3DProjectedWalls() {
         const wallStripHeight = TILE_SIZE / fixedRaydistance * distanceProjectedPlane;
 
         //Draw a rectangle with the calculated height
-        const alpha = 170 / fixedRaydistance;
-        fill(`rgba(255, 255, 255, ${alpha})`);
+        // const alpha = 170 / fixedRaydistance;
+        const alpha = 1;
+        const colorIntencity = ray.wasHitVertical ? 255 : 180;
+
+        fill(`rgba(${colorIntencity}, ${colorIntencity}, ${colorIntencity}, ${alpha})`);
         noStroke();
         rect(
             i * WALL_STRIP_WIDTH,
