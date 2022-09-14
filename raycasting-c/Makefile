@@ -1,5 +1,9 @@
+ifdef OS
+  INCLUDE = -Isrc/Include -Lsrc/lib -lmingw32
+endif
+
 build:
-	gcc -std=c99 -Isrc/Include -Lsrc/lib src/*.c -lmingw32 -lSDL2main -lSDL2 -o raycast;
+	gcc -std=c99 ./src/*.c $(INCLUDE) -lSDL2main -lSDL2 -o raycast
 
 run:
 	./raycast;
