@@ -1,5 +1,5 @@
 ifdef OS
-  INCLUDE = -Isrc/Include -Lsrc/lib -lmingw32mak
+  INCLUDE = -Isrc/Include -Lsrc/lib -lmingw32
 endif
 
 build:
