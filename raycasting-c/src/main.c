@@ -9,8 +9,11 @@ SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 int isGameRunning = FALSE;
 
+int ticksLastFrame = 0;
+int playerX, playerY;
+
 int initializeWindow() {
-  if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
     fprintf(stderr, "Error initializing SDL.\n");
     return FALSE;
   }
@@ -38,7 +41,10 @@ void destroyWindow() {
   SDL_Quit();
 }
 
-void setup() {}
+void setup() {
+  playerX = 0;
+  playerY = 0;
+}
 
 void processInput() {
   SDL_Event event;
@@ -58,12 +64,28 @@ void processInput() {
   }
 }
 
+void update() {
+  // waste some time untill we reach the target frame
+  int timeToWait = FRAME_TIME_LENGTH - (SDL_GetTicks() - ticksLastFrame);
+  if (timeToWait <= FRAME_TIME_LENGTH) {
+    SDL_Delay(timeToWait);
+  }
+
+  float deltatime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
+  ticksLastFrame = SDL_GetTicks();
+
+  playerX += 50 * deltatime;
+  playerY += 50 * deltatime;
+}
+
 void render() {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
 
-  // TODO:
-  // Render all game objects for this frame
+  SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+  SDL_Rect rect = {playerX, playerY, 20, 20};
+  SDL_RenderFillRect(renderer, &rect);
+
   SDL_RenderPresent(renderer);
 }
 
@@ -74,7 +96,7 @@ int main(int argc, char **argv) {
 
   while (isGameRunning) {
     processInput();
-    // update();
+    update();
     render();
   }
 

@@ -9,6 +9,7 @@ var window *sdl.Window
 var renderer *sdl.Renderer
 var err error
 var isGameRunning bool = false
+var playerX, playerY int32
 
 func initializeWindow() bool {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -44,7 +45,11 @@ func destroyWindow() {
 	sdl.Quit()
 }
 
-func setup() {}
+func setup() {
+	playerX = 0
+	playerY = 0
+}
+
 func processInput() {
 	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 		switch t := event.(type) {
@@ -57,11 +62,20 @@ func processInput() {
 		}
 	}
 }
+
+func update() {
+	playerX += 1
+	playerY += 1
+}
+
 func render() {
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
-	// TODO:
-	// Render all game objects for this frame
+
+	renderer.SetDrawColor(255, 255, 0, 255)
+	rect := sdl.Rect{X: playerX, Y: playerY, W: 20, H: 20}
+	renderer.FillRect(&rect)
+
 	renderer.Present()
 }
 
@@ -72,7 +86,7 @@ func main() {
 
 	for isGameRunning {
 		processInput()
-		// update()
+		update()
 		render()
 	}
 
