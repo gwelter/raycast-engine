@@ -10,8 +10,9 @@ SDL_Renderer *renderer = NULL;
 int isGameRunning = FALSE;
 
 int initializeWindow() {
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+  if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
     fprintf(stderr, "Error initializing SDL.\n");
+    return FALSE;
   }
   window = SDL_CreateWindow("Raycasting", SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH, SCREEN_HEIGHT,

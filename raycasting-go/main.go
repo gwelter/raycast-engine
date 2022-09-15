@@ -2,38 +2,79 @@ package main
 
 import "github.com/veandco/go-sdl2/sdl"
 
-func main() {
-	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
-		panic(err)
-	}
-	defer sdl.Quit()
+const SCREEN_WIDTH = 1280
+const SCREEN_HEIGHT = 720
 
-	window, err := sdl.CreateWindow("test", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED,
-		800, 600, sdl.WINDOW_SHOWN)
+var window *sdl.Window
+var renderer *sdl.Renderer
+var err error
+var isGameRunning bool = false
+
+func initializeWindow() bool {
+	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
+		println(err)
+		return false
+	}
+
+	window, err = sdl.CreateWindow("test", sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED,
+		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_BORDERLESS)
 	if err != nil {
-		panic(err)
+		println(err)
+		return false
 	}
-	defer window.Destroy()
 
-	surface, err := window.GetSurface()
+	renderer, err = sdl.CreateRenderer(window, -1, 0)
 	if err != nil {
-		panic(err)
+		println(err)
+		return false
 	}
-	surface.FillRect(nil, 0)
 
-	rect := sdl.Rect{0, 0, 200, 200}
-	surface.FillRect(&rect, 0xffff0000)
-	window.UpdateSurface()
+	err = renderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
+	if err != nil {
+		println(err)
+		return false
+	}
 
-	running := true
-	for running {
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
-			case *sdl.QuitEvent:
-				println("Quit")
-				running = false
-				break
+	return true
+}
+
+func destroyWindow() {
+	renderer.Destroy()
+	window.Destroy()
+	sdl.Quit()
+}
+
+func setup() {}
+func processInput() {
+	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+		switch t := event.(type) {
+		case *sdl.QuitEvent:
+			isGameRunning = false
+		case *sdl.KeyboardEvent:
+			if t.Keysym.Sym == sdl.K_ESCAPE {
+				isGameRunning = false
 			}
 		}
 	}
+}
+func render() {
+	renderer.SetDrawColor(0, 0, 0, 255)
+	renderer.Clear()
+	// TODO:
+	// Render all game objects for this frame
+	renderer.Present()
+}
+
+func main() {
+	isGameRunning = initializeWindow()
+
+	setup()
+
+	for isGameRunning {
+		processInput()
+		// update()
+		render()
+	}
+
+	destroyWindow()
 }
