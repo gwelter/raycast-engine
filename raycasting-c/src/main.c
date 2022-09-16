@@ -65,17 +65,12 @@ void processInput() {
 }
 
 void update() {
-  // waste some time untill we reach the target frame
-  int timeToWait = FRAME_TIME_LENGTH - (SDL_GetTicks() - ticksLastFrame);
-  if (timeToWait <= FRAME_TIME_LENGTH) {
-    SDL_Delay(timeToWait);
-  }
+  float deltaTime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
 
-  float deltatime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
+  playerX += 100 * deltaTime;
+  playerY += 100 * deltaTime;
+
   ticksLastFrame = SDL_GetTicks();
-
-  playerX += 50 * deltatime;
-  playerY += 50 * deltatime;
 }
 
 void render() {

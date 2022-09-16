@@ -4,12 +4,15 @@ import "github.com/veandco/go-sdl2/sdl"
 
 const SCREEN_WIDTH = 1280
 const SCREEN_HEIGHT = 720
+const FPS = 30
+const FRAME_TIME_LENGTH = (1000 / FPS)
 
 var window *sdl.Window
 var renderer *sdl.Renderer
 var err error
 var isGameRunning bool = false
 var playerX, playerY int32
+var ticksLastFrame uint32 = 0
 
 func initializeWindow() bool {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -18,7 +21,7 @@ func initializeWindow() bool {
 	}
 
 	window, err = sdl.CreateWindow("test", sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_BORDERLESS)
+		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_ALWAYS_ON_TOP)
 	if err != nil {
 		println(err)
 		return false
