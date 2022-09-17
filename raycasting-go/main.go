@@ -12,7 +12,7 @@ var renderer *sdl.Renderer
 var err error
 var isGameRunning bool = false
 var playerX, playerY int32
-var ticksLastFrame uint32 = 0
+var ticksLastFrame uint64 = 0
 
 func initializeWindow() bool {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -67,8 +67,12 @@ func processInput() {
 }
 
 func update() {
-	playerX += 1
-	playerY += 1
+	deltaTime := float64(sdl.GetTicks64()-ticksLastFrame) / 1000.0
+
+	playerX += int32(100 * deltaTime)
+	playerY += int32(100 * deltaTime)
+
+	ticksLastFrame = sdl.GetTicks64()
 }
 
 func render() {
