@@ -2,16 +2,39 @@ package main
 
 import "github.com/veandco/go-sdl2/sdl"
 
-const SCREEN_WIDTH = 1280
-const SCREEN_HEIGHT = 720
+const PI = 3.14159265
+const TWO_PI = 6.28318530
+const TILE_SIZE = 64
+const MAP_NUM_ROWS = 13
+const MAP_NUM_COLS = 20
+const MINIMAP_SCALE_FACTOR = 1.0
+const SCREEN_WIDTH = (MAP_NUM_COLS * TILE_SIZE)
+const SCREEN_HEIGHT = (MAP_NUM_ROWS * TILE_SIZE)
+const FOV_ANGLE = (60 * PI / 180)
+const NUM_RAYS = SCREEN_WIDTH
 const FPS = 30
 const FRAME_TIME_LENGTH = (1000 / FPS)
+
+var MAP = [MAP_NUM_ROWS][MAP_NUM_COLS]int{
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+}
 
 var window *sdl.Window
 var renderer *sdl.Renderer
 var err error
 var isGameRunning bool = false
-var playerX, playerY int32
 var ticksLastFrame uint64 = 0
 
 func initializeWindow() bool {
@@ -49,8 +72,6 @@ func destroyWindow() {
 }
 
 func setup() {
-	playerX = 0
-	playerY = 0
 }
 
 func processInput() {
@@ -67,21 +88,46 @@ func processInput() {
 }
 
 func update() {
-	deltaTime := float64(sdl.GetTicks64()-ticksLastFrame) / 1000.0
-
-	playerX += int32(100 * deltaTime)
-	playerY += int32(100 * deltaTime)
+	// deltaTime := float64(sdl.GetTicks64()-ticksLastFrame) / 1000.0
 
 	ticksLastFrame = sdl.GetTicks64()
 }
+
+func renderMap() {
+	for i := 0; i < MAP_NUM_ROWS; i++ {
+		for j := 0; j < MAP_NUM_COLS; j++ {
+			tileX := j * TILE_SIZE
+			tileY := i * TILE_SIZE
+			var tileColor uint8
+			if MAP[i][j] != 0 {
+				tileColor = 255
+			} else {
+				tileColor = 0
+			}
+
+			renderer.SetDrawColor(tileColor, tileColor, tileColor, 255)
+			mapTileRect := sdl.Rect{
+				X: int32(tileX * MINIMAP_SCALE_FACTOR),
+				Y: int32(tileY * MINIMAP_SCALE_FACTOR),
+				W: TILE_SIZE * MINIMAP_SCALE_FACTOR,
+				H: TILE_SIZE * MINIMAP_SCALE_FACTOR,
+			}
+
+			renderer.FillRect(&mapTileRect)
+		}
+	}
+}
+
+func renderRays()   {}
+func renderPlayer() {}
 
 func render() {
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
-	renderer.SetDrawColor(255, 255, 0, 255)
-	rect := sdl.Rect{X: playerX, Y: playerY, W: 20, H: 20}
-	renderer.FillRect(&rect)
+	renderMap()
+	renderRays()
+	renderPlayer()
 
 	renderer.Present()
 }
