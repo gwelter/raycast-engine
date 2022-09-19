@@ -124,12 +124,27 @@ void processInput() {
   }
 }
 
+int hasWallAt(float x, float y) {
+  if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT)
+    return true;
+
+  int i = floor(y / TILE_SIZE);
+  int j = floor(x / TILE_SIZE);
+  return map[i][j] != 0;
+}
+
 void movePlayer(float deltatime) {
   player.rotationAngle += player.turnDirection * player.turnSpeed * deltatime;
 
   float moveStep = player.walkSpeed * player.walkDirection * deltatime;
-  player.x = player.x + cos(player.rotationAngle) * moveStep;
-  player.y = player.y + sin(player.rotationAngle) * moveStep;
+  float nextX = player.x + cos(player.rotationAngle) * moveStep;
+  float nextY = player.y + sin(player.rotationAngle) * moveStep;
+
+  if (hasWallAt(nextX, nextY))
+    return;
+
+  player.x = nextX;
+  player.y = nextY;
 }
 
 void update() {

@@ -144,12 +144,29 @@ func processInput() {
 	}
 }
 
+func hasWallAt(x, y float32) bool {
+	if x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT {
+		return true
+	}
+
+	i := int(math.Floor(float64(y / TILE_SIZE)))
+	j := int(math.Floor(float64(x / TILE_SIZE)))
+	return MAP[i][j] != 0
+}
+
 func movePlayer(deltaTime float32) {
 	player.rotationAngle += float32(player.turnDirection) * player.turnSpeed * deltaTime
 	moveSpeed := player.walkSpeed * float32(player.walkDirection) * deltaTime
 
-	player.x = player.x + float32(math.Cos(float64(player.rotationAngle)))*moveSpeed
-	player.y = player.y + float32(math.Sin(float64(player.rotationAngle)))*moveSpeed
+	nextX := player.x + float32(math.Cos(float64(player.rotationAngle)))*moveSpeed
+	nextY := player.y + float32(math.Sin(float64(player.rotationAngle)))*moveSpeed
+
+	if hasWallAt(nextX, nextY) {
+		return
+	}
+
+	player.x = nextX
+	player.y = nextY
 }
 
 func update() {
