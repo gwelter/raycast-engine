@@ -1,6 +1,10 @@
 package main
 
-import "github.com/veandco/go-sdl2/sdl"
+import (
+	"math"
+
+	"github.com/veandco/go-sdl2/sdl"
+)
 
 const PI = 3.14159265
 const TWO_PI = 6.28318530
@@ -14,6 +18,18 @@ const FOV_ANGLE = (60 * PI / 180)
 const NUM_RAYS = SCREEN_WIDTH
 const FPS = 30
 const FRAME_TIME_LENGTH = (1000 / FPS)
+
+type Player struct {
+	x             float32
+	y             float32
+	width         float32
+	height        float32
+	rotationAngle float32
+	walkSpeed     float32
+	turnSpeed     float32
+	turnDirection int // -1 left - 1 right
+	walkDirection int // -1 for back - 1 for front
+}
 
 var MAP = [MAP_NUM_ROWS][MAP_NUM_COLS]int{
 	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -35,7 +51,9 @@ var window *sdl.Window
 var renderer *sdl.Renderer
 var err error
 var isGameRunning bool = false
-var ticksLastFrame uint64 = 0
+var ticksLastFrame uint32 = 0
+
+var player Player
 
 func initializeWindow() bool {
 	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
@@ -72,6 +90,17 @@ func destroyWindow() {
 }
 
 func setup() {
+	player = Player{
+		x:             SCREEN_WIDTH / 2,
+		y:             SCREEN_HEIGHT / 2,
+		width:         5,
+		height:        5,
+		turnDirection: 0,
+		walkDirection: 0,
+		rotationAngle: PI / 2.0,
+		walkSpeed:     150,
+		turnSpeed:     100 * PI / 180,
+	}
 }
 
 func processInput() {
@@ -80,17 +109,55 @@ func processInput() {
 		case *sdl.QuitEvent:
 			isGameRunning = false
 		case *sdl.KeyboardEvent:
-			if t.Keysym.Sym == sdl.K_ESCAPE {
-				isGameRunning = false
+			if t.Type == sdl.KEYDOWN {
+				if t.Keysym.Sym == sdl.K_ESCAPE {
+					isGameRunning = false
+				}
+				if t.Keysym.Sym == sdl.K_UP {
+					player.walkDirection = 1
+				}
+				if t.Keysym.Sym == sdl.K_DOWN {
+					player.walkDirection = -1
+				}
+				if t.Keysym.Sym == sdl.K_RIGHT {
+					player.turnDirection = 1
+				}
+				if t.Keysym.Sym == sdl.K_LEFT {
+					player.turnDirection = -1
+				}
+			}
+			if t.Type == sdl.KEYUP {
+				if t.Keysym.Sym == sdl.K_UP {
+					player.walkDirection = 0
+				}
+				if t.Keysym.Sym == sdl.K_DOWN {
+					player.walkDirection = 0
+				}
+				if t.Keysym.Sym == sdl.K_RIGHT {
+					player.turnDirection = 0
+				}
+				if t.Keysym.Sym == sdl.K_LEFT {
+					player.turnDirection = 0
+				}
 			}
 		}
 	}
 }
 
-func update() {
-	// deltaTime := float64(sdl.GetTicks64()-ticksLastFrame) / 1000.0
+func movePlayer(deltaTime float32) {
+	player.rotationAngle += float32(player.turnDirection) * player.turnSpeed * deltaTime
+	moveSpeed := player.walkSpeed * float32(player.walkDirection) * deltaTime
 
-	ticksLastFrame = sdl.GetTicks64()
+	player.x = player.x + float32(math.Cos(float64(player.rotationAngle)))*moveSpeed
+	player.y = player.y + float32(math.Sin(float64(player.rotationAngle)))*moveSpeed
+}
+
+func update() {
+	deltaTime := float32(sdl.GetTicks()-ticksLastFrame) / 1000.0
+
+	movePlayer(deltaTime)
+
+	ticksLastFrame = sdl.GetTicks()
 }
 
 func renderMap() {
@@ -118,8 +185,27 @@ func renderMap() {
 	}
 }
 
-func renderRays()   {}
-func renderPlayer() {}
+func renderRays() {}
+
+func renderPlayer() {
+	renderer.SetDrawColor(255, 255, 255, 255)
+	playerRect := sdl.Rect{
+		X: int32(player.x),
+		Y: int32(player.y),
+		W: int32(player.width),
+		H: int32(player.height),
+	}
+	renderer.FillRect(&playerRect)
+
+	endOfLineX := player.x + float32(math.Cos(float64(player.rotationAngle)))*40*MINIMAP_SCALE_FACTOR
+	endOfLineY := player.y + float32(math.Sin(float64(player.rotationAngle)))*40*MINIMAP_SCALE_FACTOR
+	renderer.DrawLine(
+		int32(player.x)*MINIMAP_SCALE_FACTOR,
+		int32(player.y)*MINIMAP_SCALE_FACTOR,
+		int32(endOfLineX),
+		int32(endOfLineY),
+	)
+}
 
 func render() {
 	renderer.SetDrawColor(0, 0, 0, 255)

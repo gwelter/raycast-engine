@@ -77,7 +77,7 @@ void setup() {
   player.walkDirection = 0;
   player.rotationAngle = PI / 2.0f;
   player.walkSpeed = 150;
-  player.turnSpeed = 45 * PI / 180;
+  player.turnSpeed = 100 * PI / 180;
 }
 
 void processInput() {
@@ -91,6 +91,32 @@ void processInput() {
     if (event.key.keysym.sym == SDLK_ESCAPE) {
       isGameRunning = FALSE;
     }
+    if (event.key.keysym.sym == SDLK_UP) {
+      player.walkDirection = 1;
+    }
+    if (event.key.keysym.sym == SDLK_DOWN) {
+      player.walkDirection = -1;
+    }
+    if (event.key.keysym.sym == SDLK_RIGHT) {
+      player.turnDirection = 1;
+    }
+    if (event.key.keysym.sym == SDLK_LEFT) {
+      player.turnDirection = -1;
+    }
+    break;
+  case SDL_KEYUP:
+    if (event.key.keysym.sym == SDLK_UP) {
+      player.walkDirection = 0;
+    }
+    if (event.key.keysym.sym == SDLK_DOWN) {
+      player.walkDirection = 0;
+    }
+    if (event.key.keysym.sym == SDLK_RIGHT) {
+      player.turnDirection = 0;
+    }
+    if (event.key.keysym.sym == SDLK_LEFT) {
+      player.turnDirection = 0;
+    }
     break;
 
   default:
@@ -98,8 +124,18 @@ void processInput() {
   }
 }
 
+void movePlayer(float deltatime) {
+  player.rotationAngle += player.turnDirection * player.turnSpeed * deltatime;
+
+  float moveStep = player.walkSpeed * player.walkDirection * deltatime;
+  player.x = player.x + cos(player.rotationAngle) * moveStep;
+  player.y = player.y + sin(player.rotationAngle) * moveStep;
+}
+
 void update() {
   float deltaTime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
+
+  movePlayer(deltaTime);
 
   ticksLastFrame = SDL_GetTicks();
 }
@@ -121,7 +157,22 @@ void renderMap() {
   }
 }
 void renderRays() {}
-void renderPlayer() {}
+
+void renderPlayer() {
+  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+  SDL_Rect playerRect = {
+      player.x * MINIMAP_SCALE_FACTOR,
+      player.y * MINIMAP_SCALE_FACTOR,
+      player.width * MINIMAP_SCALE_FACTOR,
+      player.height * MINIMAP_SCALE_FACTOR,
+  };
+  SDL_RenderFillRect(renderer, &playerRect);
+  SDL_RenderDrawLine(
+      renderer, player.x * MINIMAP_SCALE_FACTOR,
+      player.y * MINIMAP_SCALE_FACTOR,
+      player.x + cos(player.rotationAngle) * 40 * MINIMAP_SCALE_FACTOR,
+      player.y + sin(player.rotationAngle) * 40 * MINIMAP_SCALE_FACTOR);
+}
 
 void render() {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
