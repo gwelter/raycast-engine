@@ -1,6 +1,5 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <stdbool.h>
 #include <stdio.h>
 
 #include "constants.h"
@@ -31,6 +30,19 @@ struct Player {
   int turnDirection; // -1 left - 1 right
   int walkDirection; // -1 for back - 1 for front
 } player;
+
+struct Ray {
+  float rayAngle;
+  float wallHitX;
+  float wallHitY;
+  double distance;
+  int wasHitVertical;
+  int wallHitContent;
+  int isRayFacingUp;
+  int isRayFacingDown;
+  int isRayFacingLeft;
+  int isRayFacingRight;
+} rays[NUM_RAYS];
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -71,8 +83,8 @@ void destroyWindow() {
 void setup() {
   player.x = SCREEN_WIDTH / 2;
   player.y = SCREEN_HEIGHT / 2;
-  player.width = 5;
-  player.height = 5;
+  player.width = 1;
+  player.height = 1;
   player.turnDirection = 0;
   player.walkDirection = 0;
   player.rotationAngle = PI / 2.0f;
@@ -125,8 +137,8 @@ void processInput() {
 }
 
 int hasWallAt(float x, float y) {
-  if (x < 0 || x > SCREEN_WIDTH || y < 0 || y > SCREEN_HEIGHT)
-    return true;
+  if (x <= 0 || x >= SCREEN_WIDTH || y <= 0 || y >= SCREEN_HEIGHT)
+    return TRUE;
 
   int i = floor(y / TILE_SIZE);
   int j = floor(x / TILE_SIZE);
@@ -147,12 +159,157 @@ void movePlayer(float deltatime) {
   player.y = nextY;
 }
 
-void update() {
-  float deltaTime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
+double distanceBetweenPoints(float x1, float y1, float x2, float y2) {
+  float x = (x2 - x1) * (x2 - x1);
+  float y = (y2 - y1) * (y2 - y1);
+  return sqrt(x + y);
+}
 
-  movePlayer(deltaTime);
+float normalizeAngle(float angle) {
+  angle = remainder(angle, TWO_PI);
+  if (angle < 0) {
+    angle = TWO_PI + angle;
+  }
+  return angle;
+}
 
-  ticksLastFrame = SDL_GetTicks();
+void horizontalInterception(float rayAngle, int isRayFacingDown,
+                            float *xintercept, float *yintercept) {
+  *yintercept = floor(player.y / TILE_SIZE) * TILE_SIZE;
+  *yintercept += isRayFacingDown ? TILE_SIZE : 0;
+
+  int opositeSide = *yintercept - player.y;
+
+  *xintercept = player.x + opositeSide / tan(rayAngle);
+}
+
+void horizontalStep(float rayAngle, int isRayFacingUp, int isRayFacingLeft,
+                    int isRayFacingRight, float xintercept, float yintercept,
+                    float *x, float *y) {
+
+  int foundWallHit = FALSE;
+  float xstep, ystep;
+  float nextXTouch = xintercept;
+  float nextYTouch = yintercept;
+
+  ystep = TILE_SIZE;
+  ystep *= isRayFacingUp ? -1 : 1;
+
+  xstep = TILE_SIZE / tan(rayAngle);
+  xstep *= (isRayFacingLeft && xstep > 0) ? -1 : 1;
+  xstep *= (isRayFacingRight && xstep < 0) ? -1 : 1;
+
+  while (!foundWallHit) {
+    float xToCheck = nextXTouch;
+    float yToCheck = nextYTouch - (isRayFacingUp ? 1 : 0);
+    if (hasWallAt(xToCheck, yToCheck)) {
+      foundWallHit = TRUE;
+    } else {
+      nextXTouch += xstep;
+      nextYTouch += ystep;
+    }
+  }
+  *x = nextXTouch;
+  *y = nextYTouch;
+}
+
+void verticalInterception(float rayAngle, int isRayFacingLeft,
+                          int isRayFacingRight, float *xintercept,
+                          float *yintercept) {
+  *xintercept = 0;
+  *yintercept = 0;
+  *xintercept = floor(player.x / TILE_SIZE) * TILE_SIZE;
+  *xintercept += isRayFacingRight ? TILE_SIZE : 0;
+
+  float adjecentSide = *xintercept - player.x;
+
+  *yintercept = player.y + adjecentSide * tan(rayAngle);
+}
+
+void verticalStep(float rayAngle, int isRayFacingLeft, int isRayFacingUp,
+                  int isRayFacingDown, float xintercept, float yintercept,
+                  float *x, float *y) {
+  int foundWallHit = FALSE;
+  float xstep, ystep = 0;
+  float nextXTouch = xintercept;
+  float nextYTouch = yintercept;
+
+  xstep = TILE_SIZE;
+  xstep *= isRayFacingLeft ? -1 : 1;
+
+  ystep = TILE_SIZE * tan(rayAngle);
+  ystep *= (isRayFacingUp && ystep > 0) ? -1 : 1;
+  ystep *= (isRayFacingDown && ystep < 0) ? -1 : 1;
+
+  while (!foundWallHit) {
+    if (hasWallAt(nextXTouch - (isRayFacingLeft ? 1 : 0), nextYTouch)) {
+      foundWallHit = TRUE;
+    } else {
+      nextXTouch += xstep;
+      nextYTouch += ystep;
+    }
+  }
+  *x = nextXTouch;
+  *y = nextYTouch;
+}
+
+void castRay(float rayAngle, int stripId) {
+  rayAngle = normalizeAngle(rayAngle);
+  int isRayFacingDown = rayAngle > 0 && rayAngle < PI;
+  int isRayFacingUp = !isRayFacingDown;
+  int isRayFacingRight = rayAngle < (PI * 0.5) || rayAngle > (PI * 1.5);
+  int isRayFacingLeft = !isRayFacingRight;
+
+  int horzWallContent, vertWallContent;
+  float horzXintercept, horzYintercept;
+  float vertXintercept, vertYintercept;
+  float horzWallHitX, horzWallHitY;
+  float vertWallHitX, vertWallHitY;
+
+  horizontalInterception(rayAngle, isRayFacingDown, &horzXintercept,
+                         &horzYintercept);
+
+  horizontalStep(rayAngle, isRayFacingUp, isRayFacingLeft, isRayFacingRight,
+                 horzXintercept, horzYintercept, &horzWallHitX, &horzWallHitY);
+
+  verticalInterception(rayAngle, isRayFacingLeft, isRayFacingRight,
+                       &vertXintercept, &vertYintercept);
+
+  verticalStep(rayAngle, isRayFacingLeft, isRayFacingUp, isRayFacingDown,
+               vertXintercept, vertYintercept, &vertWallHitX, &vertWallHitY);
+
+  double horizontalDistance =
+      distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY);
+  double verticalDistance =
+      distanceBetweenPoints(player.x, player.y, vertWallHitY, vertWallHitY);
+
+  int wasHitVertical = verticalDistance < horizontalDistance;
+  if (wasHitVertical) {
+    rays[stripId].distance = verticalDistance;
+    rays[stripId].wallHitX = vertWallHitX;
+    rays[stripId].wallHitY = vertWallHitY;
+  } else {
+    rays[stripId].distance = horizontalDistance;
+    rays[stripId].wallHitX = horzWallHitX;
+    rays[stripId].wallHitY = horzWallHitY;
+  }
+
+  rays[stripId].isRayFacingUp = isRayFacingUp;
+  rays[stripId].isRayFacingDown = isRayFacingDown;
+  rays[stripId].isRayFacingLeft = isRayFacingLeft;
+  rays[stripId].isRayFacingRight = isRayFacingRight;
+  rays[stripId].rayAngle = rayAngle;
+  rays[stripId].wasHitVertical = wasHitVertical;
+}
+
+void castAllRays() {
+  // start first ray subtracting half of the FOV
+  float rayAngle = player.rotationAngle - (FOV_ANGLE / 2);
+  for (int stripId = 0; stripId < NUM_RAYS; stripId++) {
+    castRay(rayAngle, stripId);
+
+    rayAngle += FOV_ANGLE / NUM_RAYS;
+  }
 }
 
 void renderMap() {
@@ -171,7 +328,16 @@ void renderMap() {
     }
   }
 }
-void renderRays() {}
+
+void renderRays() {
+  SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+  for (int i = 0; i < NUM_RAYS; i++) {
+    SDL_RenderDrawLine(renderer, player.x * MINIMAP_SCALE_FACTOR,
+                       player.y * MINIMAP_SCALE_FACTOR,
+                       rays[i].wallHitX * MINIMAP_SCALE_FACTOR,
+                       rays[i].wallHitY * MINIMAP_SCALE_FACTOR);
+  }
+}
 
 void renderPlayer() {
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -198,6 +364,21 @@ void render() {
   renderPlayer();
 
   SDL_RenderPresent(renderer);
+}
+
+void update() {
+  int timeToWait = FRAME_TIME_LENGTH - (SDL_GetTicks() - ticksLastFrame);
+
+  if (timeToWait > 0 && timeToWait <= FRAME_TIME_LENGTH) {
+    SDL_Delay(timeToWait);
+  }
+
+  float deltaTime = (SDL_GetTicks() - ticksLastFrame) / 1000.0f;
+
+  movePlayer(deltaTime);
+  castAllRays();
+
+  ticksLastFrame = SDL_GetTicks();
 }
 
 int main(int argc, char **argv) {

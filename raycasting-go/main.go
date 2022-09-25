@@ -31,6 +31,19 @@ type Player struct {
 	walkDirection int // -1 for back - 1 for front
 }
 
+type Ray struct {
+	rayAngle         float32
+	wallHitX         float32
+	wallHitY         float32
+	distance         float32
+	wasHitVertical   int
+	wallHitContent   int
+	isRayFacingUp    int
+	isRayFacingDown  int
+	isRayFacingLeft  int
+	isRayFacingRight int
+}
+
 var MAP = [MAP_NUM_ROWS][MAP_NUM_COLS]int{
 	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -169,12 +182,18 @@ func movePlayer(deltaTime float32) {
 	player.y = nextY
 }
 
-func update() {
-	deltaTime := float32(sdl.GetTicks()-ticksLastFrame) / 1000.0
+func castRay(rayAngle float32, stripId int) {
 
-	movePlayer(deltaTime)
+}
 
-	ticksLastFrame = sdl.GetTicks()
+func castAllRays() {
+	// start first ray subtracting half of the FOV
+	rayAngle := player.rotationAngle - (FOV_ANGLE / 2)
+	for stripId := 0; stripId < NUM_RAYS; stripId++ {
+		castRay(rayAngle, stripId)
+
+		rayAngle += FOV_ANGLE / NUM_RAYS
+	}
 }
 
 func renderMap() {
@@ -233,6 +252,15 @@ func render() {
 	renderPlayer()
 
 	renderer.Present()
+}
+
+func update() {
+	deltaTime := float32(sdl.GetTicks()-ticksLastFrame) / 1000.0
+
+	movePlayer(deltaTime)
+	castAllRays()
+
+	ticksLastFrame = sdl.GetTicks()
 }
 
 func main() {
