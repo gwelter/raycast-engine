@@ -176,7 +176,7 @@ float normalizeAngle(float angle) {
 void horizontalInterception(float rayAngle, int isRayFacingDown,
                             float *xintercept, float *yintercept) {
   *yintercept = floor(player.y / TILE_SIZE) * TILE_SIZE;
-  *yintercept = *yintercept + isRayFacingDown ? TILE_SIZE : 0;
+  *yintercept += isRayFacingDown ? TILE_SIZE : 0;
 
   int opositeSide = *yintercept - player.y;
 
@@ -188,7 +188,6 @@ void horizontalStep(float rayAngle, int isRayFacingUp, int isRayFacingLeft,
                     float *x, float *y) {
 
   int foundWallHit = FALSE;
-  int wallContent;
   float xstep, ystep;
   float nextXTouch = xintercept;
   float nextYTouch = yintercept;
@@ -202,14 +201,9 @@ void horizontalStep(float rayAngle, int isRayFacingUp, int isRayFacingLeft,
 
   while (!foundWallHit) {
     float xToCheck = nextXTouch;
-    float yToCheck = nextYTouch + (isRayFacingUp ? -1 : 0);
+    float yToCheck = nextYTouch - (isRayFacingUp ? 1 : 0);
     if (hasWallAt(xToCheck, yToCheck)) {
-      wallContent = map[(int)floor(yToCheck / TILE_SIZE)]
-                       [(int)floor(xToCheck / TILE_SIZE)];
-      nextXTouch = xstep;
-      nextYTouch = ystep;
       foundWallHit = TRUE;
-      break;
     } else {
       nextXTouch += xstep;
       nextYTouch += ystep;
@@ -236,7 +230,6 @@ void verticalStep(float rayAngle, int isRayFacingLeft, int isRayFacingUp,
                   int isRayFacingDown, float xintercept, float yintercept,
                   float *x, float *y) {
   int foundWallHit = FALSE;
-  int wallContent;
   float xstep, ystep = 0;
   float nextXTouch = xintercept;
   float nextYTouch = yintercept;
@@ -249,16 +242,8 @@ void verticalStep(float rayAngle, int isRayFacingLeft, int isRayFacingUp,
   ystep *= (isRayFacingDown && ystep < 0) ? -1 : 1;
 
   while (!foundWallHit) {
-    float xToCheck = nextXTouch - (isRayFacingLeft ? 1 : 0);
-    float yToCheck = nextYTouch;
-    if (hasWallAt(nextXTouch, nextYTouch)) {
+    if (hasWallAt(nextXTouch - (isRayFacingLeft ? 1 : 0), nextYTouch)) {
       foundWallHit = TRUE;
-      wallContent = map[(int)floor(yToCheck / TILE_SIZE)]
-                       [(int)floor(xToCheck / TILE_SIZE)];
-      nextXTouch = xstep;
-      nextYTouch = ystep;
-      foundWallHit = TRUE;
-      break;
     } else {
       nextXTouch += xstep;
       nextYTouch += ystep;
