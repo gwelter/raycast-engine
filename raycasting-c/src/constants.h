@@ -1,5 +1,5 @@
-#define PI 3.14159265
-#define TWO_PI 6.28318530
+#define PI 3.14159265359
+#define TWO_PI 6.28318530718
 
 #define TILE_SIZE 64
 #define MAP_NUM_ROWS 13
@@ -12,7 +12,7 @@
 #define FOV_ANGLE (60 * PI / 180)
 #define NUM_RAYS SCREEN_WIDTH
 
-#define FPS 60
+#define FPS 30
 #define FRAME_TIME_LENGTH (1000 / FPS)
 
 #define FALSE 0

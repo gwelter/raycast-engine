@@ -145,6 +145,15 @@ int hasWallAt(float x, float y) {
   return map[i][j] != 0;
 }
 
+int wallContentAt(float x, float y) {
+  if (x <= 0 || x >= SCREEN_WIDTH || y <= 0 || y >= SCREEN_HEIGHT)
+    return 0;
+
+  int i = floor(y / TILE_SIZE);
+  int j = floor(x / TILE_SIZE);
+  return map[i][j];
+}
+
 void movePlayer(float deltatime) {
   player.rotationAngle += player.turnDirection * player.turnSpeed * deltatime;
 
@@ -185,7 +194,7 @@ void horizontalInterception(float rayAngle, int isRayFacingDown,
 
 void horizontalStep(float rayAngle, int isRayFacingUp, int isRayFacingLeft,
                     int isRayFacingRight, float xintercept, float yintercept,
-                    float *x, float *y) {
+                    float *x, float *y, int *wallHitContent) {
 
   int foundWallHit = FALSE;
   float xstep, ystep;
@@ -203,6 +212,7 @@ void horizontalStep(float rayAngle, int isRayFacingUp, int isRayFacingLeft,
     float xToCheck = nextXTouch;
     float yToCheck = nextYTouch - (isRayFacingUp ? 1 : 0);
     if (hasWallAt(xToCheck, yToCheck)) {
+      *wallHitContent = wallContentAt(xToCheck, yToCheck);
       foundWallHit = TRUE;
     } else {
       nextXTouch += xstep;
@@ -228,7 +238,7 @@ void verticalInterception(float rayAngle, int isRayFacingLeft,
 
 void verticalStep(float rayAngle, int isRayFacingLeft, int isRayFacingUp,
                   int isRayFacingDown, float xintercept, float yintercept,
-                  float *x, float *y) {
+                  float *x, float *y, int *wallHitContent) {
   int foundWallHit = FALSE;
   float xstep, ystep = 0;
   float nextXTouch = xintercept;
@@ -242,7 +252,10 @@ void verticalStep(float rayAngle, int isRayFacingLeft, int isRayFacingUp,
   ystep *= (isRayFacingDown && ystep < 0) ? -1 : 1;
 
   while (!foundWallHit) {
-    if (hasWallAt(nextXTouch - (isRayFacingLeft ? 1 : 0), nextYTouch)) {
+    float xToCheck = nextXTouch - (isRayFacingLeft ? 1 : 0);
+    float yToCheck = nextYTouch;
+    if (hasWallAt(xToCheck, nextYTouch)) {
+      *wallHitContent = wallContentAt(xToCheck, yToCheck);
       foundWallHit = TRUE;
     } else {
       nextXTouch += xstep;
@@ -270,28 +283,33 @@ void castRay(float rayAngle, int stripId) {
                          &horzYintercept);
 
   horizontalStep(rayAngle, isRayFacingUp, isRayFacingLeft, isRayFacingRight,
-                 horzXintercept, horzYintercept, &horzWallHitX, &horzWallHitY);
+                 horzXintercept, horzYintercept, &horzWallHitX, &horzWallHitY,
+                 &horzWallContent);
 
   verticalInterception(rayAngle, isRayFacingLeft, isRayFacingRight,
                        &vertXintercept, &vertYintercept);
 
   verticalStep(rayAngle, isRayFacingLeft, isRayFacingUp, isRayFacingDown,
-               vertXintercept, vertYintercept, &vertWallHitX, &vertWallHitY);
+               vertXintercept, vertYintercept, &vertWallHitX, &vertWallHitY,
+               &vertWallContent);
 
   double horizontalDistance =
       distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY);
   double verticalDistance =
-      distanceBetweenPoints(player.x, player.y, vertWallHitY, vertWallHitY);
+      distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY);
 
-  int wasHitVertical = verticalDistance < horizontalDistance;
-  if (wasHitVertical) {
+  if (verticalDistance < horizontalDistance) {
     rays[stripId].distance = verticalDistance;
     rays[stripId].wallHitX = vertWallHitX;
     rays[stripId].wallHitY = vertWallHitY;
+    rays[stripId].wallHitContent = vertWallContent;
+    rays[stripId].wasHitVertical = TRUE;
   } else {
     rays[stripId].distance = horizontalDistance;
     rays[stripId].wallHitX = horzWallHitX;
     rays[stripId].wallHitY = horzWallHitY;
+    rays[stripId].wallHitContent = horzWallContent;
+    rays[stripId].wasHitVertical = FALSE;
   }
 
   rays[stripId].isRayFacingUp = isRayFacingUp;
@@ -299,7 +317,6 @@ void castRay(float rayAngle, int stripId) {
   rays[stripId].isRayFacingLeft = isRayFacingLeft;
   rays[stripId].isRayFacingRight = isRayFacingRight;
   rays[stripId].rayAngle = rayAngle;
-  rays[stripId].wasHitVertical = wasHitVertical;
 }
 
 void castAllRays() {
