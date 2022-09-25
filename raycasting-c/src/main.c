@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <limits.h>
 #include <stdio.h>
 
 #include "constants.h"
@@ -49,7 +50,6 @@ SDL_Renderer *renderer = NULL;
 int isGameRunning = FALSE;
 
 int ticksLastFrame = 0;
-int playerX, playerY;
 
 int initializeWindow() {
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
