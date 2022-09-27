@@ -484,7 +484,7 @@ void generate3DWallProjection() {
     // TODO: render the wall from top to bottom
     for (int y = wallTopPixel; y < wallBottomPixel; y++) {
       colorBuffer[(WINDOW_WIDTH * y) + i] =
-          rays[i].wasHitVertical ? 0xFFFFFFFF : 0xFFCCCCCC;
+          rays[i].wasHitVertical ? 0xFFE4E6A8 : 0xFFD6DEA7;
     }
   }
 }
@@ -496,9 +496,11 @@ void renderColorBuffer() {
 }
 
 void clearColorBuffer(Uint32 color) {
+  int midScreen = WINDOW_HEIGHT / 2;
   for (int x = 0; x < WINDOW_WIDTH; x++) {
     for (int y = 0; y < WINDOW_HEIGHT; y++) {
-      colorBuffer[(WINDOW_WIDTH * y) + x] = color;
+      colorBuffer[(WINDOW_WIDTH * y) + x] =
+          y < midScreen ? 0xFFc6c58b : 0xFF707037;
     }
   }
 }
