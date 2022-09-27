@@ -48,8 +48,10 @@ struct Ray {
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 int isGameRunning = FALSE;
-
 int ticksLastFrame = 0;
+
+Uint32 *colorBuffer = NULL;
+SDL_Texture *colorBufferTexture = NULL;
 
 int initializeWindow() {
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -75,6 +77,8 @@ int initializeWindow() {
 }
 
 void destroyWindow() {
+  free(colorBuffer);
+  SDL_DestroyTexture(colorBufferTexture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
   SDL_Quit();
@@ -90,6 +94,12 @@ void setup() {
   player.rotationAngle = PI / 2.0f;
   player.walkSpeed = 150;
   player.turnSpeed = 100 * PI / 180;
+
+  colorBuffer = (Uint32 *)malloc(sizeof(Uint32) * (Uint32)WINDOW_WIDTH *
+                                 (Uint32)WINDOW_HEIGHT);
+  colorBufferTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_STREAMING,
+                                         WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 void processInput() {
@@ -450,13 +460,30 @@ void renderPlayer() {
   SDL_RenderDrawLine(
       renderer, player.x * MINIMAP_SCALE_FACTOR,
       player.y * MINIMAP_SCALE_FACTOR,
-      player.x + cos(player.rotationAngle) * 40 * MINIMAP_SCALE_FACTOR,
-      player.y + sin(player.rotationAngle) * 40 * MINIMAP_SCALE_FACTOR);
+      (player.x + cos(player.rotationAngle) * 40) * MINIMAP_SCALE_FACTOR,
+      (player.y + sin(player.rotationAngle) * 40) * MINIMAP_SCALE_FACTOR);
+}
+
+void renderColorBuffer() {
+  SDL_UpdateTexture(colorBufferTexture, NULL, colorBuffer,
+                    (int)((Uint32)WINDOW_WIDTH * sizeof(Uint32)));
+  SDL_RenderCopy(renderer, colorBufferTexture, NULL, NULL);
+}
+
+void clearColorBuffer(Uint32 color) {
+  for (int x = 0; x < WINDOW_WIDTH; x++) {
+    for (int y = 0; y < WINDOW_HEIGHT; y++) {
+      colorBuffer[(WINDOW_WIDTH * y) + x] = color;
+    }
+  }
 }
 
 void render() {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
+
+  renderColorBuffer();
+  clearColorBuffer(0xFF000000);
 
   renderMap();
   renderRays();

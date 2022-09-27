@@ -395,8 +395,8 @@ func renderPlayer() {
 	}
 	renderer.FillRect(&playerRect)
 
-	endOfLineX := player.x + math.Cos(player.rotationAngle)*40*MINIMAP_SCALE_FACTOR
-	endOfLineY := player.y + math.Sin(player.rotationAngle)*40*MINIMAP_SCALE_FACTOR
+	endOfLineX := (player.x + math.Cos(player.rotationAngle)*40) * MINIMAP_SCALE_FACTOR
+	endOfLineY := (player.y + math.Sin(player.rotationAngle)*40) * MINIMAP_SCALE_FACTOR
 	renderer.DrawLine(
 		int32(player.x)*MINIMAP_SCALE_FACTOR,
 		int32(player.y)*MINIMAP_SCALE_FACTOR,
