@@ -51,6 +51,7 @@ int isGameRunning = FALSE;
 int ticksLastFrame = 0;
 
 Uint32 *colorBuffer = NULL;
+Uint32 *wallTexture = NULL;
 SDL_Texture *colorBufferTexture = NULL;
 
 int initializeWindow() {
@@ -78,6 +79,7 @@ int initializeWindow() {
 
 void destroyWindow() {
   free(colorBuffer);
+  free(wallTexture);
   SDL_DestroyTexture(colorBufferTexture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -100,6 +102,18 @@ void setup() {
   colorBufferTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                          SDL_TEXTUREACCESS_STREAMING,
                                          WINDOW_WIDTH, WINDOW_HEIGHT);
+
+  wallTexture =
+      (Uint32 *)malloc(sizeof(Uint32) * (Uint32)TEX_WIDTH * (Uint32)TEX_HEIGHT);
+  for (int x = 0; x < TEX_WIDTH; x++) {
+    for (int y = 0; y < TEX_HEIGHT; y++) {
+      if (x % 8 && y % 8) {
+        colorBuffer[(TEX_WIDTH * y) + x] = 0xFF0000FF;
+      } else {
+        colorBuffer[(TEX_WIDTH * y) + x] = 0xFF000000;
+      }
+    }
+  }
 }
 
 void processInput() {
