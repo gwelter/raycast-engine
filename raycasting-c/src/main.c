@@ -108,9 +108,9 @@ void setup() {
   for (int x = 0; x < TEX_WIDTH; x++) {
     for (int y = 0; y < TEX_HEIGHT; y++) {
       if (x % 8 && y % 8) {
-        colorBuffer[(TEX_WIDTH * y) + x] = 0xFF0000FF;
+        wallTexture[(TEX_WIDTH * y) + x] = 0xFF0000FF;
       } else {
-        colorBuffer[(TEX_WIDTH * y) + x] = 0xFF000000;
+        wallTexture[(TEX_WIDTH * y) + x] = 0xFF000000;
       }
     }
   }
@@ -495,17 +495,31 @@ void generate3DWallProjection() {
     wallBottomPixel =
         wallBottomPixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wallBottomPixel;
 
+    // Paint ceeling
     Uint32 ceelingColor = 0xFFc6c58b;
     for (int y = 0; y < wallTopPixel; y++) {
       colorBuffer[(WINDOW_WIDTH * y) + i] = ceelingColor;
     }
 
-    // TODO: render the wall from top to bottom
-    for (int y = wallTopPixel; y < wallBottomPixel; y++) {
-      colorBuffer[(WINDOW_WIDTH * y) + i] =
-          rays[i].wasHitVertical ? 0xFFE4E6A8 : 0xFFD6DEA7;
+    Uint32 textureOffsetX;
+    if (rays[i].wasHitVertical) {
+      textureOffsetX = (int)rays[i].wallHitY % TILE_SIZE;
+    } else {
+      textureOffsetX = (int)rays[i].wallHitX % TILE_SIZE;
     }
 
+    // Paint walls with wallTexture
+    for (int y = wallTopPixel; y < wallBottomPixel; y++) {
+      int distanceFromTop = y + wallStripHeight / 2 - WINDOW_HEIGHT / 2;
+      Uint32 textureOffsetY =
+          distanceFromTop * ((float)TEX_HEIGHT / wallStripHeight);
+
+      Uint32 texelColor =
+          wallTexture[(TEX_WIDTH * textureOffsetY) + textureOffsetX];
+      colorBuffer[(WINDOW_WIDTH * y) + i] = texelColor;
+    }
+
+    // Paint floor
     Uint32 floorColor = 0xFF707037;
     for (int y = wallBottomPixel; y < WINDOW_HEIGHT; y++) {
       colorBuffer[(WINDOW_WIDTH * y) + i] = floorColor;
