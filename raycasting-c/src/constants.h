@@ -13,6 +13,7 @@
 
 #define TEX_WIDTH 64
 #define TEX_HEIGHT 64
+#define NUM_TEXTURES 8
 
 #define FOV_ANGLE (60 * PI / 180)
 #define NUM_RAYS SCREEN_WIDTH
