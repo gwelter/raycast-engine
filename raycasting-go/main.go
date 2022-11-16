@@ -46,18 +46,18 @@ type Ray struct {
 
 var MAP = [MAP_NUM_ROWS][MAP_NUM_COLS]int{
 	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 1},
 	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+	{1, 0, 0, 0, 2, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 1},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 5},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 1, 0, 0, 0, 0, 0, 0, 5},
+	{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 5},
+	{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 5, 5, 5, 5, 5},
 }
 
 var window *sdl.Window
@@ -107,13 +107,13 @@ func setup() {
 	player = Player{
 		x:             SCREEN_WIDTH / 2,
 		y:             SCREEN_HEIGHT / 2,
-		width:         5,
-		height:        5,
+		width:         1,
+		height:        1,
 		turnDirection: 0,
 		walkDirection: 0,
 		rotationAngle: PI / 2.0,
-		walkSpeed:     150,
-		turnSpeed:     100 * PI / 180,
+		walkSpeed:     100,
+		turnSpeed:     45 * PI / 180,
 	}
 }
 
@@ -207,24 +207,32 @@ func normalizeAngle(angle float64) float64 {
 	return angle
 }
 
-func horizontalInterception(rayAngle float64, isRayFacingDown bool) (float64, float64) {
-	yintercept := math.Floor(player.y/TILE_SIZE) * TILE_SIZE
+func castRay(rayAngle float64, stripId int) {
+	rayAngle = normalizeAngle(rayAngle)
+	isRayFacingDown := rayAngle > 0 && rayAngle < PI
+	isRayFacingUp := !isRayFacingDown
+
+	isRayFacingRight := rayAngle < 0.5*PI || rayAngle > 1.5*PI
+	isRayFacingLeft := !isRayFacingRight
+
+	///////////////////////////////////////////
+	// HORIZONTAL RAY-GRID INTERSECTION CODE
+	///////////////////////////////////////////
+	foundHorzWallHit := false
+	horzWallHitX := 0.0
+	horzWallHitY := 0.0
+	horzWallContent := 0
+
+	// Find the y-coordinate of the closest horizontal grid intersection
+	var yintercept float64 = math.Floor(player.y/TILE_SIZE) * TILE_SIZE
 	if isRayFacingDown {
 		yintercept += TILE_SIZE
 	}
 
-	opositeSide := yintercept - player.y
+	// Find the x-coordinate of the closest horizontal grid intersection
+	var xintercept float64 = player.x + (yintercept-player.y)/math.Tan(rayAngle)
 
-	xintercept := player.x + opositeSide/math.Tan(rayAngle)
-
-	return xintercept, yintercept
-}
-
-func horizontalStep(rayAngle, xintercept, yintercept float64, isRayFacingUp, isRayFacingLeft, isRayFacingRight bool) (float64, float64, int) {
-	wallContent := 0
-	nextXTouch := xintercept
-	nextYTouch := yintercept
-
+	// Calculate the increment xstep and ystep
 	ystep := float64(TILE_SIZE)
 	if isRayFacingUp {
 		ystep *= -1
@@ -238,46 +246,54 @@ func horizontalStep(rayAngle, xintercept, yintercept float64, isRayFacingUp, isR
 		xstep *= -1
 	}
 
-	for {
-		xToCheck := nextXTouch
-		yToCheck := nextYTouch
+	nextHorzTouchX := xintercept
+	nextHorzTouchY := yintercept
+
+	// Increment xstep and ystep until we find a wall
+	for nextHorzTouchX >= 0 && nextHorzTouchX <= SCREEN_WIDTH && nextHorzTouchY >= 0 && nextHorzTouchY <= SCREEN_HEIGHT {
+		xToCheck := nextHorzTouchX
+		yToCheck := nextHorzTouchY
 		if isRayFacingUp {
-			yToCheck -= 1
+			yToCheck += -1
 		}
+
 		if hasWallAt(xToCheck, yToCheck) {
-			wallContent = wallContentAt(xToCheck, yToCheck)
+			// found a wall hit
+			horzWallHitX = nextHorzTouchX
+			horzWallHitY = nextHorzTouchY
+			horzWallContent = MAP[int(math.Floor(yToCheck/TILE_SIZE))][int(math.Floor(xToCheck/TILE_SIZE))]
+			foundHorzWallHit = true
 			break
 		} else {
-			nextXTouch += xstep
-			nextYTouch += ystep
+			nextHorzTouchX += xstep
+			nextHorzTouchY += float64(ystep)
 		}
 	}
 
-	return nextXTouch, nextYTouch, wallContent
-}
-func verticalInterception(rayAngle float64, isRayFacingRight bool) (float64, float64) {
-	xintercept := math.Floor(player.x/TILE_SIZE) * TILE_SIZE
+	///////////////////////////////////////////
+	// VERTICAL RAY-GRID INTERSECTION CODE
+	///////////////////////////////////////////
+	foundVertWallHit := false
+	vertWallHitX := 0.0
+	vertWallHitY := 0.0
+	vertWallContent := 0
+
+	// Find the x-coordinate of the closest horizontal grid intersection
+	xintercept = math.Floor(player.x/TILE_SIZE) * TILE_SIZE
 	if isRayFacingRight {
-		xintercept += TILE_SIZE
+		xintercept += float64(TILE_SIZE)
 	}
 
-	adjecentSide := xintercept - player.x
+	// Find the y-coordinate of the closest horizontal grid intersection
+	yintercept = player.y + (xintercept-player.x)*math.Tan(rayAngle)
 
-	yintercept := player.y + adjecentSide*math.Tan(rayAngle)
-	return xintercept, yintercept
-}
-
-func verticalStep(rayAngle, xintercept, yintercept float64, isRayFacingUp, isRayFacingDown, isRayFacingLeft bool) (float64, float64, int) {
-	wallContent := 0
-	nextXTouch := xintercept
-	nextYTouch := yintercept
-
-	xstep := float64(TILE_SIZE)
+	// Calculate the increment xstep and ystep
+	xstep = TILE_SIZE
 	if isRayFacingLeft {
 		xstep *= -1
 	}
 
-	ystep := TILE_SIZE * math.Tan(rayAngle)
+	ystep = TILE_SIZE * math.Tan(rayAngle)
 	if isRayFacingUp && ystep > 0 {
 		ystep *= -1
 	}
@@ -285,47 +301,48 @@ func verticalStep(rayAngle, xintercept, yintercept float64, isRayFacingUp, isRay
 		ystep *= -1
 	}
 
-	for {
-		xToCheck := nextXTouch
+	nextVertTouchX := xintercept
+	nextVertTouchY := yintercept
+
+	// Increment xstep and ystep until we find a wall
+	for nextVertTouchX >= 0 && nextVertTouchX <= SCREEN_WIDTH && nextVertTouchY >= 0 && nextVertTouchY <= SCREEN_HEIGHT {
+		xToCheck := nextVertTouchX
 		if isRayFacingLeft {
-			xToCheck -= 1
+			xToCheck += -1
 		}
-		yToCheck := nextYTouch
+		yToCheck := nextVertTouchY
+
 		if hasWallAt(xToCheck, yToCheck) {
-			wallContent = wallContentAt(xToCheck, yToCheck)
+			// found a wall hit
+			vertWallHitX = nextVertTouchX
+			vertWallHitY = nextVertTouchY
+			vertWallContent = MAP[int(math.Floor(yToCheck/TILE_SIZE))][int(math.Floor(xToCheck/TILE_SIZE))]
+			foundVertWallHit = true
 			break
 		} else {
-			nextXTouch += xstep
-			nextYTouch += ystep
+			nextVertTouchX += xstep
+			nextVertTouchY += ystep
 		}
 	}
-	return nextXTouch, nextYTouch, wallContent
-}
 
-func castRay(rayAngle float64, stripId int) {
-	rayAngle = normalizeAngle(rayAngle)
-	isRayFacingDown := rayAngle > 0 && rayAngle < PI
-	isRayFacingUp := !isRayFacingDown
-	isRayFacingLeft := rayAngle < (0.5*PI) || rayAngle > (1.5*PI)
-	isRayFacingRight := !isRayFacingLeft
+	// Calculate both horizontal and vertical hit distances and choose the smallest one
+	horzHitDistance := math.MaxFloat64
+	if foundHorzWallHit {
+		horzHitDistance = distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY)
+	}
+	vertHitDistance := math.MaxFloat64
+	if foundVertWallHit {
+		vertHitDistance = distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY)
+	}
 
-	xintercept, yintercept := horizontalInterception(rayAngle, isRayFacingDown)
-	horzWallHitX, horzWallHitY, horzWallContent := horizontalStep(rayAngle, xintercept, yintercept, isRayFacingUp, isRayFacingLeft, isRayFacingDown)
-
-	xintercept, yintercept = verticalInterception(rayAngle, isRayFacingRight)
-	vertWallHitX, vertWallHitY, vertWallContent := verticalStep(rayAngle, xintercept, yintercept, isRayFacingUp, isRayFacingDown, isRayFacingLeft)
-
-	horizontalDistance := distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY)
-	verticalDistance := distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY)
-
-	if verticalDistance < horizontalDistance {
-		rays[stripId].distance = verticalDistance
+	if vertHitDistance < horzHitDistance {
+		rays[stripId].distance = vertHitDistance
 		rays[stripId].wallHitX = vertWallHitX
 		rays[stripId].wallHitY = vertWallHitY
 		rays[stripId].wallHitContent = vertWallContent
 		rays[stripId].wasHitVertical = true
 	} else {
-		rays[stripId].distance = horizontalDistance
+		rays[stripId].distance = horzHitDistance
 		rays[stripId].wallHitX = horzWallHitX
 		rays[stripId].wallHitY = horzWallHitY
 		rays[stripId].wallHitContent = horzWallContent
