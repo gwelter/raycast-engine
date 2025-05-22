@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -8,6 +9,13 @@
 #include "constants.h"
 #include "textures.h"
 
+Uint32 frameStart;
+Uint32 lastTime;
+int frameTime = 0;
+int frameCount = 0;
+int fps = 0;
+
+SDL_Color whiteColor = {255, 255, 255};
 const int map[MAP_NUM_ROWS][MAP_NUM_COLS] = {
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
@@ -48,6 +56,7 @@ struct Ray {
   int isRayFacingRight;
 } rays[NUM_RAYS];
 
+TTF_Font *font = NULL;
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
 int isGameRunning = FALSE;
@@ -56,6 +65,8 @@ int ticksLastFrame = 0;
 uint32_t *colorBuffer = NULL;
 uint32_t *textures[NUM_TEXTURES];
 SDL_Texture *colorBufferTexture = NULL;
+SDL_Surface *textSurface = NULL;
+SDL_Texture *textTexture = NULL;
 
 int initializeWindow() {
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -76,6 +87,16 @@ int initializeWindow() {
     return FALSE;
   }
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+
+  if (TTF_Init() != 0) {
+    fprintf(stderr, "Error initializing TTF.\n");
+    return FALSE;
+  }
+  font = TTF_OpenFont(MY_FONT, 24);
+  if (!font) {
+    fprintf(stderr, "Error opening font.\n");
+    return FALSE;
+  }
 
   return TRUE;
 }
@@ -541,6 +562,30 @@ void clearColorBuffer(uint32_t color) {
   }
 }
 
+void renderMiniMap() {
+  renderMap();
+  renderRays();
+  renderPlayer();
+}
+
+void renderFPS() {
+  frameCount++;
+  Uint32 currentTime = SDL_GetTicks();
+  if (currentTime - lastTime >= 1000) {
+    fps = frameCount * 1000.0f / (currentTime - lastTime);
+    frameCount = 0;
+    lastTime = currentTime;
+  }
+
+  char *text;
+  SDL_asprintf(&text, "FPS: %d", fps);
+  textSurface = TTF_RenderText_Solid(font, text, whiteColor);
+  textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+  SDL_Rect textRect = {WINDOW_WIDTH - textSurface->w - 5, 5, textSurface->w, textSurface->h};
+  SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+  SDL_free(text);
+}
+
 void render() {
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
   SDL_RenderClear(renderer);
@@ -550,9 +595,8 @@ void render() {
   renderColorBuffer();
   clearColorBuffer(0xFF292929);
 
-  renderMap();
-  renderRays();
-  renderPlayer();
+  renderMiniMap();
+  renderFPS();
 
   SDL_RenderPresent(renderer);
 }
@@ -577,7 +621,9 @@ int main(int argc, char **argv) {
 
   setup();
 
+  lastTime = SDL_GetTicks();
   while (isGameRunning) {
+    frameStart = SDL_GetTicks();
     processInput();
     update();
     render();

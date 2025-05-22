@@ -23,3 +23,5 @@
 
 #define FALSE 0
 #define TRUE 1
+
+#define MY_FONT "font.ttf"
