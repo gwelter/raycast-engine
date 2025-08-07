@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 )
 
 const PI = math.Pi
@@ -11,12 +14,19 @@ const TWO_PI = math.Pi * 2
 const TILE_SIZE = 64
 const MAP_NUM_ROWS = 13
 const MAP_NUM_COLS = 20
-const MINIMAP_SCALE_FACTOR = 1.0
+const MINIMAP_SCALE_FACTOR = 0.2
+const MINIMAP_TILE_SIZE = 12
+const WINDOW_WIDTH = SCREEN_WIDTH
+const WINDOW_HEIGHT = SCREEN_HEIGHT
+const TEX_WIDTH = 64
+const TEX_HEIGHT = 64
+const NUM_TEXTURES = 8
+const MY_FONT = "../assets/font.ttf"
 const SCREEN_WIDTH = (MAP_NUM_COLS * TILE_SIZE)
 const SCREEN_HEIGHT = (MAP_NUM_ROWS * TILE_SIZE)
 const FOV_ANGLE = (60 * PI / 180)
 const NUM_RAYS = SCREEN_WIDTH
-const FPS = 30
+const FPS = 60
 const FRAME_TIME_LENGTH = (1000 / FPS)
 
 type Player struct {
@@ -69,28 +79,48 @@ var ticksLastFrame uint64 = 0
 var player Player
 var rays [NUM_RAYS]Ray
 
+var colorBuffer []uint32
+var colorBufferTexture *sdl.Texture
+var font *ttf.Font
+var lastTime uint64
+var frameCount int = 0
+var fps int = 0
+
+// Basic texture data - simplified colored textures
+var textures [NUM_TEXTURES][TEX_WIDTH * TEX_HEIGHT]uint32
+
 func initializeWindow() bool {
-	if err = sdl.Init(sdl.INIT_EVERYTHING); err != nil {
-		println(err)
+	if err = sdl.Init(sdl.INIT_VIDEO); err != nil {
+		fmt.Printf("Error initializing SDL: %v\n", err)
 		return false
 	}
 
-	window, err = sdl.CreateWindow("test", sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED,
-		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_ALWAYS_ON_TOP)
+	window, err = sdl.CreateWindow("Raycasting", sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED,
+		SCREEN_WIDTH, SCREEN_HEIGHT, sdl.WINDOW_BORDERLESS)
 	if err != nil {
-		println(err)
+		fmt.Printf("Error creating window: %v\n", err)
 		return false
 	}
 
 	renderer, err = sdl.CreateRenderer(window, -1, 0)
 	if err != nil {
-		println(err)
+		fmt.Printf("Error creating renderer: %v\n", err)
 		return false
 	}
 
 	err = renderer.SetDrawBlendMode(sdl.BLENDMODE_BLEND)
 	if err != nil {
-		println(err)
+		fmt.Printf("Error setting blend mode: %v\n", err)
+		return false
+	}
+
+	if err = ttf.Init(); err != nil {
+		fmt.Printf("Error initializing TTF: %v\n", err)
+		return false
+	}
+	font, err = ttf.OpenFont(MY_FONT, 24)
+	if err != nil {
+		fmt.Printf("Error opening font: %v\n", err)
 		return false
 	}
 
@@ -98,6 +128,13 @@ func initializeWindow() bool {
 }
 
 func destroyWindow() {
+	if colorBufferTexture != nil {
+		colorBufferTexture.Destroy()
+	}
+	if font != nil {
+		font.Close()
+	}
+	ttf.Quit()
 	renderer.Destroy()
 	window.Destroy()
 	sdl.Quit()
@@ -112,8 +149,36 @@ func setup() {
 		turnDirection: 0,
 		walkDirection: 0,
 		rotationAngle: PI / 2.0,
-		walkSpeed:     100,
-		turnSpeed:     45 * PI / 180,
+		walkSpeed:     150,
+		turnSpeed:     100 * PI / 180,
+	}
+
+	colorBuffer = make([]uint32, WINDOW_WIDTH*WINDOW_HEIGHT)
+	colorBufferTexture, err = renderer.CreateTexture(sdl.PIXELFORMAT_ARGB8888, sdl.TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT)
+	if err != nil {
+		fmt.Printf("Error creating color buffer texture: %v\n", err)
+	}
+
+	initTextures()
+}
+
+func initTextures() {
+	// Simple colored textures for now - you can replace with real texture data later
+	colors := []uint32{
+		0xFF8B4513, // REDBRICK - brown
+		0xFF800080, // PURPLESTONE - purple
+		0xFF556B2F, // MOSSYSTONE - olive
+		0xFF808080, // GRAYSTONE - gray
+		0xFFFF6347, // COLORSTONE - tomato
+		0xFF4169E1, // BLUESTONE - royal blue
+		0xFFD2691E, // WOOD - chocolate
+		0xFF8B4513, // EAGLE - brown
+	}
+
+	for i := 0; i < NUM_TEXTURES; i++ {
+		for j := 0; j < TEX_WIDTH*TEX_HEIGHT; j++ {
+			textures[i][j] = colors[i]
+		}
 	}
 }
 
@@ -261,7 +326,7 @@ func castRay(rayAngle float64, stripId int) {
 			// found a wall hit
 			horzWallHitX = nextHorzTouchX
 			horzWallHitY = nextHorzTouchY
-			horzWallContent = MAP[int(math.Floor(yToCheck/TILE_SIZE))][int(math.Floor(xToCheck/TILE_SIZE))]
+			horzWallContent = wallContentAt(xToCheck, yToCheck)
 			foundHorzWallHit = true
 			break
 		} else {
@@ -316,7 +381,7 @@ func castRay(rayAngle float64, stripId int) {
 			// found a wall hit
 			vertWallHitX = nextVertTouchX
 			vertWallHitY = nextVertTouchY
-			vertWallContent = MAP[int(math.Floor(yToCheck/TILE_SIZE))][int(math.Floor(xToCheck/TILE_SIZE))]
+			vertWallContent = wallContentAt(xToCheck, yToCheck)
 			foundVertWallHit = true
 			break
 		} else {
@@ -379,10 +444,10 @@ func renderMap() {
 
 			renderer.SetDrawColor(tileColor, tileColor, tileColor, 255)
 			mapTileRect := sdl.Rect{
-				X: int32(tileX * MINIMAP_SCALE_FACTOR),
-				Y: int32(tileY * MINIMAP_SCALE_FACTOR),
-				W: TILE_SIZE * MINIMAP_SCALE_FACTOR,
-				H: TILE_SIZE * MINIMAP_SCALE_FACTOR,
+				X: int32(float64(tileX) * MINIMAP_SCALE_FACTOR),
+				Y: int32(float64(tileY) * MINIMAP_SCALE_FACTOR),
+				W: int32(MINIMAP_TILE_SIZE),
+				H: int32(MINIMAP_TILE_SIZE),
 			}
 
 			renderer.FillRect(&mapTileRect)
@@ -394,8 +459,8 @@ func renderRays() {
 	renderer.SetDrawColor(255, 0, 0, 255)
 	for i := 0; i < NUM_RAYS; i++ {
 		renderer.DrawLine(
-			int32(player.x)*MINIMAP_SCALE_FACTOR,
-			int32(player.y)*MINIMAP_SCALE_FACTOR,
+			int32(player.x*MINIMAP_SCALE_FACTOR),
+			int32(player.y*MINIMAP_SCALE_FACTOR),
 			int32(rays[i].wallHitX*MINIMAP_SCALE_FACTOR),
 			int32(rays[i].wallHitY*MINIMAP_SCALE_FACTOR),
 		)
@@ -404,31 +469,123 @@ func renderRays() {
 
 func renderPlayer() {
 	renderer.SetDrawColor(255, 255, 255, 255)
-	playerRect := sdl.Rect{
-		X: int32(player.x),
-		Y: int32(player.y),
-		W: int32(player.width),
-		H: int32(player.height),
-	}
-	renderer.FillRect(&playerRect)
 
 	endOfLineX := (player.x + math.Cos(player.rotationAngle)*40) * MINIMAP_SCALE_FACTOR
 	endOfLineY := (player.y + math.Sin(player.rotationAngle)*40) * MINIMAP_SCALE_FACTOR
 	renderer.DrawLine(
-		int32(player.x)*MINIMAP_SCALE_FACTOR,
-		int32(player.y)*MINIMAP_SCALE_FACTOR,
+		int32(player.x*MINIMAP_SCALE_FACTOR),
+		int32(player.y*MINIMAP_SCALE_FACTOR),
 		int32(endOfLineX),
 		int32(endOfLineY),
 	)
+}
+
+func generate3DWallProjection() {
+	distanceProjPlane := float64(WINDOW_WIDTH/2) / math.Tan(FOV_ANGLE/2)
+	for i := 0; i < NUM_RAYS; i++ {
+		fixedRayDistance := rays[i].distance * math.Cos(rays[i].rayAngle-player.rotationAngle)
+
+		projectedWallHeight := float64(TILE_SIZE) / fixedRayDistance * distanceProjPlane
+
+		wallStripHeight := int(projectedWallHeight)
+		wallTopPixel := WINDOW_HEIGHT/2 - wallStripHeight/2
+		if wallTopPixel < 0 {
+			wallTopPixel = 0
+		}
+
+		wallBottomPixel := WINDOW_HEIGHT/2 + wallStripHeight/2
+		if wallBottomPixel > WINDOW_HEIGHT {
+			wallBottomPixel = WINDOW_HEIGHT
+		}
+
+		// Paint ceiling
+		ceilingColor := uint32(0xFFc6c58b)
+		for y := 0; y < wallTopPixel; y++ {
+			colorBuffer[WINDOW_WIDTH*y+i] = ceilingColor
+		}
+
+		// Calculate texture offset
+		var textureOffsetX int
+		if rays[i].wasHitVertical {
+			textureOffsetX = int(rays[i].wallHitY) % TILE_SIZE
+		} else {
+			textureOffsetX = int(rays[i].wallHitX) % TILE_SIZE
+		}
+
+		// Paint walls with texture
+		for y := wallTopPixel; y < wallBottomPixel; y++ {
+			distanceFromTop := y + wallStripHeight/2 - WINDOW_HEIGHT/2
+			textureOffsetY := int(float64(distanceFromTop) * float64(TEX_HEIGHT) / float64(wallStripHeight))
+
+			if textureOffsetY >= 0 && textureOffsetY < TEX_HEIGHT && textureOffsetX >= 0 && textureOffsetX < TEX_WIDTH && rays[i].wallHitContent > 0 && rays[i].wallHitContent <= NUM_TEXTURES {
+				texelColor := textures[rays[i].wallHitContent-1][TEX_WIDTH*textureOffsetY+textureOffsetX]
+				colorBuffer[WINDOW_WIDTH*y+i] = texelColor
+			}
+		}
+
+		// Paint floor
+		floorColor := uint32(0xFF707037)
+		for y := wallBottomPixel; y < WINDOW_HEIGHT; y++ {
+			colorBuffer[WINDOW_WIDTH*y+i] = floorColor
+		}
+	}
+}
+
+func renderColorBuffer() {
+	colorBufferTexture.Update(nil, unsafe.Pointer(&colorBuffer[0]), WINDOW_WIDTH*4)
+	renderer.Copy(colorBufferTexture, nil, nil)
+}
+
+func clearColorBuffer(color uint32) {
+	for i := 0; i < len(colorBuffer); i++ {
+		colorBuffer[i] = color
+	}
+}
+
+func renderFPS() {
+	frameCount++
+	currentTime := sdl.GetTicks64()
+	if currentTime-lastTime >= 1000 {
+		fps = int(float64(frameCount) * 1000.0 / float64(currentTime-lastTime))
+		frameCount = 0
+		lastTime = currentTime
+	}
+
+	text := fmt.Sprintf("FPS: %d", fps)
+	surface, err := font.RenderUTF8Solid(text, sdl.Color{R: 255, G: 255, B: 255, A: 255})
+	if err == nil {
+		textTexture, err := renderer.CreateTextureFromSurface(surface)
+		if err == nil {
+			textRect := sdl.Rect{
+				X: int32(WINDOW_WIDTH - int(surface.W) - 5),
+				Y: 5,
+				W: surface.W,
+				H: surface.H,
+			}
+			renderer.Copy(textTexture, nil, &textRect)
+			textTexture.Destroy()
+		}
+		surface.Free()
+	}
+}
+
+func renderMiniMap() {
+	renderMap()
+	renderRays()
+	renderPlayer()
 }
 
 func render() {
 	renderer.SetDrawColor(0, 0, 0, 255)
 	renderer.Clear()
 
-	renderMap()
-	renderRays()
-	renderPlayer()
+	generate3DWallProjection()
+
+	renderColorBuffer()
+	clearColorBuffer(0xFF292929)
+
+	renderMiniMap()
+	renderFPS()
 
 	renderer.Present()
 }
@@ -447,6 +604,7 @@ func main() {
 
 	setup()
 
+	lastTime = sdl.GetTicks64()
 	for isGameRunning {
 		processInput()
 		update()
