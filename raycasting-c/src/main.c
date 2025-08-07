@@ -9,7 +9,6 @@
 #include "constants.h"
 #include "textures.h"
 
-Uint32 frameStart;
 Uint32 lastTime;
 int frameTime = 0;
 int frameCount = 0;
@@ -595,7 +594,6 @@ int main(int argc, char **argv) {
 
   lastTime = SDL_GetTicks();
   while (isGameRunning) {
-    frameStart = SDL_GetTicks();
     processInput();
     update();
     render();
