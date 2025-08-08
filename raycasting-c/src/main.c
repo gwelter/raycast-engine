@@ -76,6 +76,9 @@ SDL_Texture *textTexture = NULL;
 char fpsTextBuffer[FPS_TEXT_BUFFER_SIZE];
 static const uint32_t ceilingColor = 0xFFc6c58b;
 static const uint32_t floorColor = 0xFF707037;
+static const float invTileSize = 1.0f / TILE_SIZE;
+static const float halfPi = PI * 0.5f;
+static const float oneAndHalfPi = PI * 1.5f;
 
 int initializeWindow() {
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -221,19 +224,19 @@ void processInput() {
   }
 }
 
-int hasWallAt(float x, float y) {
+static inline int hasWallAt(float x, float y) {
   if (x <= 0 || x >= SCREEN_WIDTH || y <= 0 || y >= SCREEN_HEIGHT) return TRUE;
 
-  int i = floor(y / TILE_SIZE);
-  int j = floor(x / TILE_SIZE);
+  int i = (int)(y * invTileSize);
+  int j = (int)(x * invTileSize);
   return map[i][j] != 0;
 }
 
-int wallContentAt(float x, float y) {
+static inline int wallContentAt(float x, float y) {
   if (x <= 0 || x >= SCREEN_WIDTH || y <= 0 || y >= SCREEN_HEIGHT) return 0;
 
-  int i = floor(y / TILE_SIZE);
-  int j = floor(x / TILE_SIZE);
+  int i = (int)(y * invTileSize);
+  int j = (int)(x * invTileSize);
   return map[i][j];
 }
 
@@ -250,10 +253,10 @@ void movePlayer(float deltatime) {
   player.y = nextY;
 }
 
-double distanceBetweenPoints(float x1, float y1, float x2, float y2) {
-  float x = (x2 - x1) * (x2 - x1);
-  float y = (y2 - y1) * (y2 - y1);
-  return sqrt(x + y);
+static inline double distanceBetweenPoints(float x1, float y1, float x2, float y2) {
+  float dx = (x2 - x1);
+  float dy = (y2 - y1);
+  return sqrt(dx * dx + dy * dy);
 }
 
 float normalizeAngle(float angle) {
@@ -349,7 +352,7 @@ void castRay(float rayAngle, int stripId) {
   int isRayFacingDown = rayAngle > 0 && rayAngle < PI;
   int isRayFacingUp = !isRayFacingDown;
 
-  int isRayFacingRight = rayAngle < 0.5 * PI || rayAngle > 1.5 * PI;
+  int isRayFacingRight = rayAngle < halfPi || rayAngle > oneAndHalfPi;
   int isRayFacingLeft = !isRayFacingRight;
 
   float xintercept, yintercept;
@@ -364,7 +367,7 @@ void castRay(float rayAngle, int stripId) {
   int horzWallContent = 0;
 
   // Find the y-coordinate of the closest horizontal grid intersection
-  yintercept = floor(player.y / TILE_SIZE) * TILE_SIZE;
+  yintercept = floor(player.y * invTileSize) * TILE_SIZE;
   yintercept += isRayFacingDown ? TILE_SIZE : 0;
 
   // Find the x-coordinate of the closest horizontal grid intersection
@@ -391,7 +394,7 @@ void castRay(float rayAngle, int stripId) {
       // found a wall hit
       horzWallHitX = nextHorzTouchX;
       horzWallHitY = nextHorzTouchY;
-      horzWallContent = map[(int)floor(yToCheck / TILE_SIZE)][(int)floor(xToCheck / TILE_SIZE)];
+      horzWallContent = map[(int)(yToCheck * invTileSize)][(int)(xToCheck * invTileSize)];
       foundHorzWallHit = TRUE;
       break;
     } else {
@@ -409,7 +412,7 @@ void castRay(float rayAngle, int stripId) {
   int vertWallContent = 0;
 
   // Find the x-coordinate of the closest horizontal grid intersection
-  xintercept = floor(player.x / TILE_SIZE) * TILE_SIZE;
+  xintercept = floor(player.x * invTileSize) * TILE_SIZE;
   xintercept += isRayFacingRight ? TILE_SIZE : 0;
 
   // Find the y-coordinate of the closest horizontal grid intersection
@@ -436,7 +439,7 @@ void castRay(float rayAngle, int stripId) {
       // found a wall hit
       vertWallHitX = nextVertTouchX;
       vertWallHitY = nextVertTouchY;
-      vertWallContent = map[(int)floor(yToCheck / TILE_SIZE)][(int)floor(xToCheck / TILE_SIZE)];
+      vertWallContent = map[(int)(yToCheck * invTileSize)][(int)(xToCheck * invTileSize)];
       foundVertWallHit = TRUE;
       break;
     } else {
@@ -521,17 +524,19 @@ void renderPlayer() {
 }
 
 void generate3DWallProjection() {
-  float distanceProjPlane = (WINDOW_WIDTH / 2) / tan(FOV_ANGLE / 2);
+  static const float distanceProjPlane = (WINDOW_WIDTH / 2.0f) / tan(FOV_ANGLE / 2.0f);
+  static const int halfWindowHeight = WINDOW_HEIGHT / 2;
+  
   for (int i = 0; i < NUM_RAYS; i++) {
-    float fixedRaydistance = rays[i].distance * cos((rays[i].rayAngle - player.rotationAngle));
+    float fixedRaydistance = rays[i].distance * cos(rays[i].rayAngle - player.rotationAngle);
 
     float projectedWallHeight = TILE_SIZE / fixedRaydistance * distanceProjPlane;
 
     int wallStripHeight = (int)projectedWallHeight;
-    int wallTopPixel = WINDOW_HEIGHT / 2 - wallStripHeight / 2;
+    int wallTopPixel = halfWindowHeight - (wallStripHeight >> 1);
     wallTopPixel = wallTopPixel < 0 ? 0 : wallTopPixel;
 
-    int wallBottomPixel = WINDOW_HEIGHT / 2 + wallStripHeight / 2;
+    int wallBottomPixel = halfWindowHeight + (wallStripHeight >> 1);
     wallBottomPixel = wallBottomPixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wallBottomPixel;
 
     // Paint ceiling
@@ -547,11 +552,14 @@ void generate3DWallProjection() {
     }
 
     // Paint walls with wallTexture
+    uint32_t *texture = textures[rays[i].wallHitContent - 1];
+    float texScaleY = (float)TEX_HEIGHT / wallStripHeight;
+    
     for (int y = wallTopPixel; y < wallBottomPixel; y++) {
-      int distanceFromTop = y + wallStripHeight / 2 - WINDOW_HEIGHT / 2;
-      uint32_t textureOffsetY = distanceFromTop * ((float)TEX_HEIGHT / wallStripHeight);
+      int distanceFromTop = y + (wallStripHeight >> 1) - halfWindowHeight;
+      uint32_t textureOffsetY = (uint32_t)(distanceFromTop * texScaleY);
 
-      uint32_t texelColor = textures[rays[i].wallHitContent - 1][(TEX_WIDTH * textureOffsetY) + textureOffsetX];
+      uint32_t texelColor = texture[(TEX_WIDTH * textureOffsetY) + textureOffsetX];
       colorBuffer[(WINDOW_WIDTH * y) + i] = texelColor;
     }
 
