@@ -15,3 +15,7 @@ clean-c:
 
 clean-go:
 	@$(MAKE) -C raycasting-go clean
+
+.PHONY: test-c
+test-c:
+	@$(MAKE) -C raycasting-c test

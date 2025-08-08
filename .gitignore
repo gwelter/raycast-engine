@@ -1,5 +1,6 @@
 *.exe
 */raycast
+*/raycast_tests
 */.zig-cache
 */zig-out
 

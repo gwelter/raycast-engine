@@ -14,7 +14,7 @@ int frameTime = 0;
 int frameCount = 0;
 int fps = 0;
 
-SDL_Color whiteColor = {255, 255, 255};
+SDL_Color whiteColor = {255, 255, 255, 255};
 const int map[MAP_NUM_ROWS][MAP_NUM_COLS] = {
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
