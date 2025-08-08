@@ -5,14 +5,20 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "constants.h"
 #include "textures.h"
+
+#define CACHE_LINE_SIZE 64
+#define FPS_TEXT_BUFFER_SIZE 32
 
 Uint32 lastTime;
 int frameTime = 0;
 int frameCount = 0;
 int fps = 0;
+int lastFpsRendered = -1;
 
 SDL_Color whiteColor = {255, 255, 255, 255};
 const int map[MAP_NUM_ROWS][MAP_NUM_COLS] = {
@@ -67,6 +73,9 @@ uint32_t *textures[NUM_TEXTURES];
 SDL_Texture *colorBufferTexture = NULL;
 SDL_Surface *textSurface = NULL;
 SDL_Texture *textTexture = NULL;
+char fpsTextBuffer[FPS_TEXT_BUFFER_SIZE];
+static const uint32_t ceilingColor = 0xFFc6c58b;
+static const uint32_t floorColor = 0xFF707037;
 
 int initializeWindow() {
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -101,10 +110,20 @@ int initializeWindow() {
 }
 
 void destroyWindow() {
+#ifdef _WIN32
+  if (colorBuffer) _aligned_free(colorBuffer);
+#else
   free(colorBuffer);
-  SDL_DestroyTexture(colorBufferTexture);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
+#endif
+  
+  if (colorBufferTexture) SDL_DestroyTexture(colorBufferTexture);
+  if (textTexture) SDL_DestroyTexture(textTexture);
+  if (textSurface) SDL_FreeSurface(textSurface);
+  if (font) TTF_CloseFont(font);
+  if (renderer) SDL_DestroyRenderer(renderer);
+  if (window) SDL_DestroyWindow(window);
+  
+  TTF_Quit();
   SDL_Quit();
 }
 
@@ -119,7 +138,32 @@ void setup() {
   player.walkSpeed = 150;
   player.turnSpeed = 100 * PI / 180;
 
-  colorBuffer = (uint32_t *)malloc(sizeof(uint32_t) * (uint32_t)WINDOW_WIDTH * (uint32_t)WINDOW_HEIGHT);
+  size_t numPixels = (size_t)WINDOW_WIDTH * (size_t)WINDOW_HEIGHT;
+  size_t bufferSize = numPixels * sizeof(uint32_t);
+  
+  if (numPixels > SIZE_MAX / sizeof(uint32_t)) {
+    fprintf(stderr, "Error: color buffer size overflow.\n");
+    isGameRunning = FALSE;
+    return;
+  }
+
+#ifdef _WIN32
+  colorBuffer = (uint32_t*)_aligned_malloc(bufferSize, 64);
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  colorBuffer = (uint32_t*)aligned_alloc(64, bufferSize);
+#else
+  if (posix_memalign((void**)&colorBuffer, 64, bufferSize) != 0) {
+    colorBuffer = NULL;
+  }
+#endif
+
+  if (!colorBuffer) {
+    fprintf(stderr, "Error: failed to allocate aligned color buffer.\n");
+    isGameRunning = FALSE;
+    return;
+  }
+
+  memset(colorBuffer, 0, bufferSize);
   colorBufferTexture =
       SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -490,10 +534,9 @@ void generate3DWallProjection() {
     int wallBottomPixel = WINDOW_HEIGHT / 2 + wallStripHeight / 2;
     wallBottomPixel = wallBottomPixel > WINDOW_HEIGHT ? WINDOW_HEIGHT : wallBottomPixel;
 
-    // Paint ceeling
-    uint32_t ceelingColor = 0xFFc6c58b;
+    // Paint ceiling
     for (int y = 0; y < wallTopPixel; y++) {
-      colorBuffer[(WINDOW_WIDTH * y) + i] = ceelingColor;
+      colorBuffer[(WINDOW_WIDTH * y) + i] = ceilingColor;
     }
 
     uint32_t textureOffsetX;
@@ -513,7 +556,6 @@ void generate3DWallProjection() {
     }
 
     // Paint floor
-    uint32_t floorColor = 0xFF707037;
     for (int y = wallBottomPixel; y < WINDOW_HEIGHT; y++) {
       colorBuffer[(WINDOW_WIDTH * y) + i] = floorColor;
     }
@@ -526,9 +568,16 @@ void renderColorBuffer() {
 }
 
 void clearColorBuffer(uint32_t color) {
-  for (int x = 0; x < WINDOW_WIDTH; x++) {
-    for (int y = 0; y < WINDOW_HEIGHT; y++) {
-      colorBuffer[(WINDOW_WIDTH * y) + x] = color;
+  size_t numPixels = (size_t)WINDOW_WIDTH * (size_t)WINDOW_HEIGHT;
+  
+  if (color == 0) {
+    memset(colorBuffer, 0, numPixels * sizeof(uint32_t));
+  } else {
+    uint32_t *ptr = colorBuffer;
+    uint32_t *end = colorBuffer + numPixels;
+    
+    while (ptr < end) {
+      *ptr++ = color;
     }
   }
 }
@@ -548,13 +597,27 @@ void renderFPS() {
     lastTime = currentTime;
   }
 
-  char *text;
-  SDL_asprintf(&text, "FPS: %d", fps);
-  textSurface = TTF_RenderText_Solid(font, text, whiteColor);
-  textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-  SDL_Rect textRect = {WINDOW_WIDTH - textSurface->w - 5, 5, textSurface->w, textSurface->h};
-  SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
-  SDL_free(text);
+  // Only (re)create the FPS texture when the value changes, typically once per second
+  if (fps != lastFpsRendered) {
+    if (textTexture) {
+      SDL_DestroyTexture(textTexture);
+      textTexture = NULL;
+    }
+    if (textSurface) {
+      SDL_FreeSurface(textSurface);
+      textSurface = NULL;
+    }
+    snprintf(fpsTextBuffer, FPS_TEXT_BUFFER_SIZE, "FPS: %d", fps);
+    textSurface = TTF_RenderText_Solid(font, fpsTextBuffer, whiteColor);
+    if (textSurface) {
+      textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+      lastFpsRendered = fps;
+    }
+  }
+  if (textSurface && textTexture) {
+    SDL_Rect textRect = {WINDOW_WIDTH - textSurface->w - 5, 5, textSurface->w, textSurface->h};
+    SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+  }
 }
 
 void render() {
