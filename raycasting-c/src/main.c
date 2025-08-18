@@ -259,6 +259,12 @@ static inline double distanceBetweenPoints(float x1, float y1, float x2, float y
   return sqrt(dx * dx + dy * dy);
 }
 
+static inline double distanceBetweenPointsSquared(float x1, float y1, float x2, float y2) {
+  float dx = (x2 - x1);
+  float dy = (y2 - y1);
+  return dx * dx + dy * dy;
+}
+
 float normalizeAngle(float angle) {
   angle = remainder(angle, TWO_PI);
   if (angle < 0) {
@@ -450,19 +456,19 @@ void castRay(float rayAngle, int stripId) {
 
   // Calculate both horizontal and vertical hit distances and choose the
   // smallest one
-  float horzHitDistance =
-      foundHorzWallHit ? distanceBetweenPoints(player.x, player.y, horzWallHitX, horzWallHitY) : FLT_MAX;
-  float vertHitDistance =
-      foundVertWallHit ? distanceBetweenPoints(player.x, player.y, vertWallHitX, vertWallHitY) : FLT_MAX;
+  float horzHitDistanceSquared =
+      foundHorzWallHit ? distanceBetweenPointsSquared(player.x, player.y, horzWallHitX, horzWallHitY) : FLT_MAX;
+  float vertHitDistanceSquared =
+      foundVertWallHit ? distanceBetweenPointsSquared(player.x, player.y, vertWallHitX, vertWallHitY) : FLT_MAX;
 
-  if (vertHitDistance < horzHitDistance) {
-    rays[stripId].distance = vertHitDistance;
+  if (vertHitDistanceSquared < horzHitDistanceSquared) {
+    rays[stripId].distance = sqrt(vertHitDistanceSquared);
     rays[stripId].wallHitX = vertWallHitX;
     rays[stripId].wallHitY = vertWallHitY;
     rays[stripId].wallHitContent = vertWallContent;
     rays[stripId].wasHitVertical = TRUE;
   } else {
-    rays[stripId].distance = horzHitDistance;
+    rays[stripId].distance = sqrt(horzHitDistanceSquared);
     rays[stripId].wallHitX = horzWallHitX;
     rays[stripId].wallHitY = horzWallHitY;
     rays[stripId].wallHitContent = horzWallContent;
@@ -524,7 +530,10 @@ void renderPlayer() {
 }
 
 void generate3DWallProjection() {
-  static const float distanceProjPlane = (WINDOW_WIDTH / 2.0f) / tan(FOV_ANGLE / 2.0f);
+  static float distanceProjPlane = 0.0f;
+  if (distanceProjPlane == 0.0f) {
+    distanceProjPlane = (WINDOW_WIDTH / 2.0f) / tan(FOV_ANGLE / 2.0f);
+  }
   static const int halfWindowHeight = WINDOW_HEIGHT / 2;
   
   for (int i = 0; i < NUM_RAYS; i++) {
@@ -646,7 +655,7 @@ void render() {
 void update() {
   int timeToWait = FRAME_TIME_LENGTH - (SDL_GetTicks() - ticksLastFrame);
 
-  if (timeToWait > 0 && timeToWait <= FRAME_TIME_LENGTH) {
+  if (FPS_LIMIT != 0 && timeToWait > 0 && timeToWait <= FRAME_TIME_LENGTH) {
     SDL_Delay(timeToWait);
   }
 
